@@ -1,0 +1,106 @@
+#!/bin/sh
+
+SH='/usr/bin/env sh'
+
+LN='/usr/bin/env ln -sr'
+
+RMDIR='rmdir --ignore-fail-on-non-empty'
+
+CREATED_DIR_CACHE='.created_dirs'
+CREATED_LINKS_CACHE='.created_links'
+
+# takes a given application name and returns whether or not it can
+# be installed; looks in the current directory for properly
+# formatted application folder according to spec.
+#
+# $1 - the name of the application to verify
+
+can_install() {
+    # locate the installation approval script
+    verify_script="$1"'/inst.sh'
+
+    if [ -x "$verify_script" ]; then
+        if $SH "$verify_script"; then
+            return 0
+        fi
+    else
+        if [ -n "$(command -v "$appname")" ]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# installs the configuration files for the given input application
+# based on the `meta` file location in the given application's
+# folder according to the spec. searches current directory.
+#
+# $1 - the name of the application to install
+
+install_config() {
+    # setup default install variables
+    install_dir="$HOME""/.config/""$1"
+
+    # execute meta overriding defaults
+    meta_script="$1"'/meta'
+    if [ -x "$meta_script" ]; then
+        . "$meta_script"
+    fi
+
+    # make sure config files exist
+    conf_files_location="$1"'/conf'
+    if [ ! -d "$conf_files_location" ]; then
+        return 1
+    fi
+
+    # create install dir if it doesn't exist
+    if [ ! -d "$install_dir" ]; then
+        mkdir -p "$install_dir" || { echo "error creating dir"; exit 1; }
+        echo "$install_dir" >> "$CREATED_DIR_CACHE" 
+    fi
+
+    for to_copy in $conf_files_location/*; do
+        $LN "$to_copy" "$install_dir" || echo "cannot make symlink"
+
+        copy_filename="$(basename "$to_copy")"
+        echo "$install_dir"'/'"$copy_filename" >> "$CREATED_LINKS_CACHE"
+    done
+}
+
+# installs all application packages in the given directory by first
+# checking if they can be installed, then runnning the install
+# command on them
+
+install() {
+    for folder in */; do
+        appname="${folder%/}"
+
+        if can_install "$appname"; then
+            echo "can install ""$appname"
+            install_config "$appname"
+        else
+            echo "cannot install ""$appname"
+        fi
+
+    done
+}
+
+uninstall() {
+    # remove created symlinks
+    if [ -f "$CREATED_LINKS_CACHE" ]; then
+        for created_symlink in $(cat "$CREATED_LINKS_CACHE"); do
+            if [ -e "$created_symlink" ]; then
+                rm "$created_symlink"
+            fi
+        done
+    fi
+
+    # remove empty created folders
+    if [ -f "$CREATED_DIR_CACHE" ]; then
+        for created_folder in $(cat "$CREATED_DIR_CACHE"); do
+            $RMDIR "$created_folder"
+        done
+    fi
+
+    rm -f "$CREATED_DIR_CACHE" "$CREATED_LINKS_CACHE"
+}
