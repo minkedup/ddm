@@ -5,30 +5,18 @@ time.
 
 ## Design Considerations
 
-In the past I had used `stow` to manage my dotfiles and was fairly satisfied
-with that program. It would handily symlink everything for me, and all I needed
-to do was give it a folder with my configurations in it. But this option began
-to butt-up against my needs all to quickly. While `stow` is certainly a capable
-program, I ran into several issues when using it:
+`ddm` as a program aims to follow these tenants: 
 
-- File Conflicts
-    - Handling existing conflicts was a nightmare (I had to write my own bash
-      script to avoid them)
-- Dependencies
-    - `stow` can be built easily on nearly any machine, props to the developers.
-      However, I often use machines where the only dependencies that I can rely
-      on are `git` and `bash`/`sh`. I want to use a program that can work in the
-      as many environments as possible.
-
-So, why did I end up building my own system instead of using one of the already
-existing systems? Well, I decided to make my own system for one primary reason:
-
-- Familiarity
-    - I am already familiar with using `bash` scripts to subvert the strange
-      abnormalities of `stow`, so I thought that I would go ahead and write
-      everything in POSIX `sh` to create a fully integrated system. 
+- Simple
+- Easy to Understand
+- Few Dependencies
 
 ## The Standard 
+
+Everything about the "packaging" for configuration files was designed with
+simplicity in mind - both on the programming and using side. Basically
+everything about configuration management uses `sh` to setup variables and
+install packages.
 
 - Each application-specific configuration will have its own directory with the
   same name as the application for which the configurations exist.
@@ -89,3 +77,25 @@ root_dir="$HOME/.kitty"
 *Instead of being installed in the default (*`$HOME/.config/kitty`*), the kitty
 application configuration files will instead be installed in the home directory
 under the name* "`.kitty`".
+
+## The Backstory 
+
+In the past I had used `stow` to manage my dotfiles and was fairly satisfied
+with that solution. It would handily symlink everything for me, and all I
+needed to do was give it a folder with my configurations in it. But this choice
+began to butt-up against my needs. While `stow` is certainly a capable program,
+I ran into several issues when using it:
+
+- File Conflicts
+    - Handling existing conflicts was a nightmare (I had to write my own bash
+      script to avoid them).
+- Dependencies
+    - `stow` can be built easily on nearly any machine, props to the developers.
+      However, I often use machines where the only dependencies that I can rely
+      on are `git` and `bash`/`sh`. I want to use a program that can work in the
+      as many environments as possible.
+
+So, why did I end up building my own system instead of using one of the already
+existing systems? My reasoning was that I had already used scripts to plan
+`stow`'s misgivings, so I might as well go all the way and write a dotfile
+manager in POSIX `sh`.
