@@ -6,6 +6,8 @@ SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
 RMDIR='rmdir --ignore-fail-on-non-empty'
 
+CONF_FILE_GLOB='.[A-Za-z]* *'
+
 CREATED_DIR_CACHE='.created_dirs'
 CREATED_LINKS_CACHE='.created_links'
 
@@ -96,15 +98,19 @@ can_install() {
 #
 # $1 - the name of the application to install
 install_config() {
+    # find meta script directory
+    meta_script="$1"'/meta'
+
     # setup default install variables
     install_dir="$HOME""/.config/""$1"
 
-    # execute meta overriding defaults
-    meta_script="$1"'/meta'
     if [ -x "$meta_script" ]; then
         # shellcheck disable=SC1090
         . "$meta_script"
     fi
+
+    # notify user about the installation of the dotfiles for the given application
+    info 'installing dotfiles for "'"$appname"'" to "'"$install_dir"'"'
 
     # make sure config files exist
     conf_files_location="$1"'/conf'
@@ -120,7 +126,7 @@ install_config() {
         echo "$install_dir" >> "$CREATED_DIR_CACHE" 
     fi
 
-    conf_files="$conf_files_location"'/*'
+    conf_files="$conf_files_location"'/.[A-Za-z]*'
 
     for to_copy in $conf_files; do
         destination="$install_dir"'/'"$(basename "$to_copy")"
