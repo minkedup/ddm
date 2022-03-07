@@ -6,7 +6,7 @@ SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
 RMDIR='rmdir --ignore-fail-on-non-empty'
 
-CONF_FILE_GLOB='.[A-Za-z]* *'
+DOTFILES_GLOB='.[!.]*'
 
 CREATED_DIR_CACHE='.created_dirs'
 CREATED_LINKS_CACHE='.created_links'
@@ -126,8 +126,17 @@ install_config() {
         echo "$install_dir" >> "$CREATED_DIR_CACHE" 
     fi
 
-    conf_files="$conf_files_location"'/.[A-Za-z]*'
+    # collect all of the dotfiles that we need to install
+    local_dotfiles_glob="$conf_files_location"'/'"$DOTFILES_GLOB"
+    for f in $local_dotfiles_glob; do conf_files="$conf_files"' '"$f"; done
+    if [ "${conf_files# }" = "$local_dotfiles_glob" ]; then conf_files=''; fi
 
+    # collect any additional files that we need to install
+    local_otherfiles_glob="$conf_files_location"'/'"*"
+    for f in $local_otherfiles_glob; do conf_files="$conf_files"' '"$f"; done
+    if [ "${conf_files# }" = "$local_otherfiles_glob" ]; then conf_files=''; fi
+
+    # iterate through files linking to the right location
     for to_copy in $conf_files; do
         destination="$install_dir"'/'"$(basename "$to_copy")"
 
