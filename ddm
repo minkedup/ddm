@@ -32,7 +32,6 @@ DESCRIPTION
 SUBCOMMANDS:
     install      Install application configurations
     uninstall    Remove installed application configurations
-    generate     Generate a new application from a template
 
 OPTIONS:
     -f    Do not prompt for file conflicts 
@@ -42,7 +41,7 @@ EOF
 }
 
 info() {
-    if [ $VERBOSE -gt 0 ]; then
+    if [ "$VERBOSE" -gt 0 ]; then
         printf '%b[ info ]%b %s\n' "$GRAY" "$WHITE" "$1" 
     fi
 }
@@ -116,6 +115,7 @@ install_config() {
 
     # create install dir if it doesn't exist
     if [ ! -d "$install_dir" ]; then
+        info 'creating installation directory "'"$install_dir"'"'
         mkdir -p "$install_dir" || { error 'could not create install directory'; return 1; }
         echo "$install_dir" >> "$CREATED_DIR_CACHE" 
     fi
@@ -125,28 +125,21 @@ install_config() {
     for to_copy in $conf_files; do
         destination="$install_dir"'/'"$(basename "$to_copy")"
 
-        echo "$destination"
-
-        go_ahead=0
-        if [ -f "$destination" ]; then
+        if [ -e "$destination" ]; then
             info 'destination "'"$destination"'" already exists - conflict'
 
             if [ "$FORCE" -gt 0 ]; then
                 info 'force enabled; skipping "'"$destination"'"'
-                go_ahead=1
             else
-                if conflict "$destination"; then
-                    go_ahead=1
-                else
+                if ! conflict "$destination"; then
                     info 'skipping "'"$(basename "$to_copy")"'"'
+                    continue
                 fi
             fi
         fi
 
-        if [ "$go_ahead" -gt 0 ]; then
-            $LN "$to_copy" "$install_dir" || error 'cannot create symlink to '"$to_copy" 
-        fi
-
+        info 'linking "'"$(basename "$to_copy")"'" to "'"$destination"'"'
+        $LN "$to_copy" "$install_dir" || error 'cannot create symlink to '"$destination" 
 
         echo "$destination" >> "$CREATED_LINKS_CACHE"
     done
@@ -160,7 +153,7 @@ install() {
         appname="${folder%/}"
 
         if can_install "$appname"; then
-            info 'installing '"$appname"'...'
+            info 'installing '"$appname"
             install_config "$appname"
         else
             warn 'cannot install '"$appname"
@@ -184,6 +177,7 @@ uninstall() {
         # shellcheck disable=SC2013
         for created_symlink in $(cat "$CREATED_LINKS_CACHE"); do
             if [ -e "$created_symlink" ]; then
+                info 'removing symlink "'"$created_symlink"'"'
                 rm "$created_symlink"
             fi
         done
@@ -194,6 +188,7 @@ uninstall() {
     if [ -f "$CREATED_DIR_CACHE" ]; then
         # shellcheck disable=SC2013
         for created_folder in $(cat "$CREATED_DIR_CACHE"); do
+            info 'removing directory "'"$created_folder"'" if empty'
             $RMDIR "$created_folder"
         done
     fi
@@ -205,6 +200,11 @@ uninstall() {
 if [ $# -lt 1 ]; then
     usage
     exit 1
+fi
+
+if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
+    usage
+    exit 0
 fi
 
 # parse command line options
