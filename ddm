@@ -1,9 +1,7 @@
 #!/bin/sh
 
 SH='/usr/bin/env sh'
-
 LN='/usr/bin/env ln -sr'
-
 RMDIR='rmdir --ignore-fail-on-non-empty'
 
 CREATED_DIR_CACHE='.created_dirs'
@@ -14,7 +12,6 @@ CREATED_LINKS_CACHE='.created_links'
 # formatted application folder according to spec.
 #
 # $1 - the name of the application to verify
-
 can_install() {
     # locate the installation approval script
     verify_script="$1"'/inst.sh'
@@ -36,7 +33,6 @@ can_install() {
 # folder according to the spec. searches current directory.
 #
 # $1 - the name of the application to install
-
 install_config() {
     # setup default install variables
     install_dir="$HOME""/.config/""$1"
@@ -44,6 +40,7 @@ install_config() {
     # execute meta overriding defaults
     meta_script="$1"'/meta'
     if [ -x "$meta_script" ]; then
+        # shellcheck disable=SC1090
         . "$meta_script"
     fi
 
@@ -59,7 +56,7 @@ install_config() {
         echo "$install_dir" >> "$CREATED_DIR_CACHE" 
     fi
 
-    for to_copy in $conf_files_location/*; do
+    for to_copy in "$conf_files_location"/*; do
         $LN "$to_copy" "$install_dir" || echo "cannot make symlink"
 
         copy_filename="$(basename "$to_copy")"
@@ -70,7 +67,6 @@ install_config() {
 # installs all application packages in the given directory by first
 # checking if they can be installed, then runnning the install
 # command on them
-
 install() {
     for folder in */; do
         appname="${folder%/}"
@@ -85,9 +81,14 @@ install() {
     done
 }
 
+# uses the corresponding cache files to remove the installed
+# symlinks and folders, first removing the symlinks, then removing
+# the empty folders that remain (and leaving the ones that aren't
+# empty)
 uninstall() {
     # remove created symlinks
     if [ -f "$CREATED_LINKS_CACHE" ]; then
+        # shellcheck disable=SC2013
         for created_symlink in $(cat "$CREATED_LINKS_CACHE"); do
             if [ -e "$created_symlink" ]; then
                 rm "$created_symlink"
@@ -97,6 +98,7 @@ uninstall() {
 
     # remove empty created folders
     if [ -f "$CREATED_DIR_CACHE" ]; then
+        # shellcheck disable=SC2013
         for created_folder in $(cat "$CREATED_DIR_CACHE"); do
             $RMDIR "$created_folder"
         done
