@@ -35,18 +35,14 @@ SUBCOMMANDS:
     generate     Generate a new application from a template
 
 OPTIONS:
-    -f, --force     Do not prompt for file conflicts 
-
-    -n, --simulate  Do not actually make any filesystem changes
-    -v, --verbose   Increase verbosity to debug levels
-
-    -V, --version   Show ddm version number
-    -h, --help      Show this help
+    -f    Do not prompt for file conflicts 
+    -v    Increase verbosity to debug levels
+    -h    Show this help
 EOF
 }
 
 info() {
-    if [ $VERBOSE ]; then
+    if [ $VERBOSE -gt 0 ]; then
         printf '%b[ info ]%b %s\n' "$GRAY" "$WHITE" "$1" 
     fi
 }
@@ -57,6 +53,21 @@ warn() {
 
 error() {
     printf '%b[ erro ]%b %s\n' "$RED" "$WHITE" "$1"
+}
+
+# manual conflict resolution prompt to resolve conflicts
+# with files that exist where a symlink is going to be
+# placed
+# $1 - The location of the file that produced the collision
+# return - 0 for overwrite, 1 for keeping the original
+conflict() {
+    warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
+    choice='y'
+    read -r choice
+    case $choice in
+        [Yy]*) return 0 ;;
+        [Nn]*) return 1 ;;
+    esac
 }
 
 # takes a given application name and returns whether or not it can
@@ -109,11 +120,35 @@ install_config() {
         echo "$install_dir" >> "$CREATED_DIR_CACHE" 
     fi
 
-    for to_copy in "$conf_files_location"/*; do
-        $LN "$to_copy" "$install_dir" || error 'cannot create symlink to '"$to_copy" 
+    conf_files="$conf_files_location"'/*'
 
-        copy_filename="$(basename "$to_copy")"
-        echo "$install_dir"'/'"$copy_filename" >> "$CREATED_LINKS_CACHE"
+    for to_copy in $conf_files; do
+        destination="$install_dir"'/'"$(basename "$to_copy")"
+
+        echo "$destination"
+
+        go_ahead=0
+        if [ -f "$destination" ]; then
+            info 'destination "'"$destination"'" already exists - conflict'
+
+            if [ "$FORCE" -gt 0 ]; then
+                info 'force enabled; skipping "'"$destination"'"'
+                go_ahead=1
+            else
+                if conflict "$destination"; then
+                    go_ahead=1
+                else
+                    info 'skipping "'"$(basename "$to_copy")"'"'
+                fi
+            fi
+        fi
+
+        if [ "$go_ahead" -gt 0 ]; then
+            $LN "$to_copy" "$install_dir" || error 'cannot create symlink to '"$to_copy" 
+        fi
+
+
+        echo "$destination" >> "$CREATED_LINKS_CACHE"
     done
 }
 
@@ -121,16 +156,11 @@ install_config() {
 # checking if they can be installed, then runnning the install
 # command on them
 install() {
-    if [ "$(ls -d)" = '.' ]; then
-        error 'no folders found in current directory with the right format'
-        exit 1
-    fi
-
     for folder in */; do
         appname="${folder%/}"
 
         if can_install "$appname"; then
-            info 'installing '"$appname"
+            info 'installing '"$appname"'...'
             install_config "$appname"
         else
             warn 'cannot install '"$appname"
@@ -143,6 +173,12 @@ install() {
 # the empty folders that remain (and leaving the ones that aren't
 # empty)
 uninstall() {
+    # if no cache files exist we should warn the user about it and exit
+    if [ ! -f "$CREATED_LINKS_CACHE" ] && [ ! -f "$CREATED_DIR_CACHE" ]; then
+        warn 'cache files do not exist; are you sure you installed?'
+        return 1
+    fi
+
     # remove cached created symlinks
     if [ -f "$CREATED_LINKS_CACHE" ]; then
         # shellcheck disable=SC2013
@@ -151,8 +187,6 @@ uninstall() {
                 rm "$created_symlink"
             fi
         done
-    else
-        warn 'cache files not found - are you sure you installed configs?'
     fi
 
 
@@ -173,11 +207,31 @@ if [ $# -lt 1 ]; then
     exit 1
 fi
 
+# parse command line options
+subcommand=$1; shift
+while getopts "fvVh" opt; do
+    case $opt in
+        f )
+            FORCE=1
+        ;;
+        v )
+            VERBOSE=1
+        ;;
+        h )
+            usage
+            exit 0
+        ;;
+        ? )
+            error 'unrecognized flag passed in'
+            exit 1
+        ;;
+    esac
+done
 
 # process subcommands
-if [ "$1" = "install" ]; then
+if [ "$subcommand" = "install" ]; then
     install
-elif [ "$1" = "uninstall" ]; then
+elif [ "$subcommand" = "uninstall" ]; then
     uninstall
 else
     error 'unrecognized subcommand! please use a valid subcommand'
