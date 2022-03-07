@@ -126,19 +126,25 @@ install_config() {
         echo "$install_dir" >> "$CREATED_DIR_CACHE" 
     fi
 
+    # intit var for valid configuration files
+    conf_files=''
+
     # collect all of the dotfiles that we need to install
+    to_add=''
     local_dotfiles_glob="$conf_files_location"'/'"$DOTFILES_GLOB"
-    for f in $local_dotfiles_glob; do conf_files="$conf_files"' '"$f"; done
-    if [ "${conf_files# }" = "$local_dotfiles_glob" ]; then conf_files=''; fi
+    for f in $local_dotfiles_glob; do to_add="$to_add"' '"$f"; done
+    if [ ! "${to_add# }" = "$local_dotfiles_glob" ]; then conf_files="$conf_files""$to_add"; fi
 
     # collect any additional files that we need to install
+    to_add=''
     local_otherfiles_glob="$conf_files_location"'/'"*"
-    for f in $local_otherfiles_glob; do conf_files="$conf_files"' '"$f"; done
-    if [ "${conf_files# }" = "$local_otherfiles_glob" ]; then conf_files=''; fi
+    for f in $local_otherfiles_glob; do to_add="$to_add"' '"$f"; done
+    if [ ! "${to_add# }" = "$local_otherfiles_glob" ]; then conf_files="$conf_files""$to_add"; fi
 
     # iterate through files linking to the right location
     for to_copy in $conf_files; do
-        destination="$install_dir"'/'"$(basename "$to_copy")"
+        to_copy_name="$(basename "$to_copy")"
+        destination="$install_dir"'/'"$to_copy_name"
 
         if [ -e "$destination" ]; then
             info 'destination "'"$destination"'" already exists - conflict'
@@ -153,7 +159,7 @@ install_config() {
             fi
         fi
 
-        info 'linking "'"$(basename "$to_copy")"'" to "'"$destination"'"'
+        info 'linking "'"$to_copy_name"'" to "'"$destination"'"'
         $LN "$to_copy" "$install_dir" || error 'cannot create symlink to '"$destination" 
 
         echo "$destination" >> "$CREATED_LINKS_CACHE"
@@ -251,4 +257,5 @@ elif [ "$subcommand" = "uninstall" ]; then
 else
     error 'unrecognized subcommand! please use a valid subcommand'
     usage
+    exit 1
 fi
