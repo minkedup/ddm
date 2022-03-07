@@ -1,11 +1,63 @@
 #!/bin/sh
 
+VERSION='0.0.1'
+
 SH='/usr/bin/env sh'
-LN='/usr/bin/env ln -sr'
+LN='/usr/bin/env ln -srf'
 RMDIR='rmdir --ignore-fail-on-non-empty'
 
 CREATED_DIR_CACHE='.created_dirs'
 CREATED_LINKS_CACHE='.created_links'
+
+RED='\e[31m'
+BOLD='\e[1m'
+GRAY='\e[90m'
+WHITE='\e[0m'
+GREEN='\e[32m'
+YELLO='\e[33m'
+
+VERBOSE=0
+FORCE=0
+
+usage() {
+cat << EOF
+ddm version $VERSION
+
+usage: ddm <command> [<args>]
+
+DESCRIPTION
+    Ddm is a useful tool for deploying and syncing user local
+    configurations/dotfiles.
+
+SUBCOMMANDS:
+    install      Install application configurations
+    uninstall    Remove installed application configurations
+    generate     Generate a new application from a template
+
+OPTIONS:
+    -f, --force     Do not prompt for file conflicts 
+
+    -n, --simulate  Do not actually make any filesystem changes
+    -v, --verbose   Increase verbosity to debug levels
+
+    -V, --version   Show ddm version number
+    -h, --help      Show this help
+EOF
+}
+
+info() {
+    if [ $VERBOSE ]; then
+        printf '%b[ info ]%b %s\n' "$GRAY" "$WHITE" "$1" 
+    fi
+}
+
+warn() {
+    printf '%b[ warn ]%b %s\n' "$YELLO" "$WHITE" "$1"
+}
+
+error() {
+    printf '%b[ erro ]%b %s\n' "$RED" "$WHITE" "$1"
+}
 
 # takes a given application name and returns whether or not it can
 # be installed; looks in the current directory for properly
@@ -47,17 +99,18 @@ install_config() {
     # make sure config files exist
     conf_files_location="$1"'/conf'
     if [ ! -d "$conf_files_location" ]; then
+        warn 'could not find config files for application '"$1"
         return 1
     fi
 
     # create install dir if it doesn't exist
     if [ ! -d "$install_dir" ]; then
-        mkdir -p "$install_dir" || { echo "error creating dir"; exit 1; }
+        mkdir -p "$install_dir" || { error 'could not create install directory'; return 1; }
         echo "$install_dir" >> "$CREATED_DIR_CACHE" 
     fi
 
     for to_copy in "$conf_files_location"/*; do
-        $LN "$to_copy" "$install_dir" || echo "cannot make symlink"
+        $LN "$to_copy" "$install_dir" || error 'cannot create symlink to '"$to_copy" 
 
         copy_filename="$(basename "$to_copy")"
         echo "$install_dir"'/'"$copy_filename" >> "$CREATED_LINKS_CACHE"
@@ -68,16 +121,20 @@ install_config() {
 # checking if they can be installed, then runnning the install
 # command on them
 install() {
+    if [ "$(ls -d)" = '.' ]; then
+        error 'no folders found in current directory with the right format'
+        exit 1
+    fi
+
     for folder in */; do
         appname="${folder%/}"
 
         if can_install "$appname"; then
-            echo "can install ""$appname"
+            info 'installing '"$appname"
             install_config "$appname"
         else
-            echo "cannot install ""$appname"
+            warn 'cannot install '"$appname"
         fi
-
     done
 }
 
@@ -86,7 +143,7 @@ install() {
 # the empty folders that remain (and leaving the ones that aren't
 # empty)
 uninstall() {
-    # remove created symlinks
+    # remove cached created symlinks
     if [ -f "$CREATED_LINKS_CACHE" ]; then
         # shellcheck disable=SC2013
         for created_symlink in $(cat "$CREATED_LINKS_CACHE"); do
@@ -94,7 +151,10 @@ uninstall() {
                 rm "$created_symlink"
             fi
         done
+    else
+        warn 'cache files not found - are you sure you installed configs?'
     fi
+
 
     # remove empty created folders
     if [ -f "$CREATED_DIR_CACHE" ]; then
@@ -106,3 +166,20 @@ uninstall() {
 
     rm -f "$CREATED_DIR_CACHE" "$CREATED_LINKS_CACHE"
 }
+
+# check the number of arguments
+if [ $# -lt 1 ]; then
+    usage
+    exit 1
+fi
+
+
+# process subcommands
+if [ "$1" = "install" ]; then
+    install
+elif [ "$1" = "uninstall" ]; then
+    uninstall
+else
+    error 'unrecognized subcommand! please use a valid subcommand'
+    usage
+fi
