@@ -31,7 +31,7 @@ DESCRIPTION
     Ddm is a useful tool for deploying and syncing user local
     configurations/dotfiles.
 
-SUBCOMMANDS:
+COMMANDS:
     install      Install application configurations
     uninstall    Remove installed application configurations
 
@@ -107,15 +107,18 @@ conflict() {
 # return - 0 for link success, 1 for failure
 
 logged_ln() {
+    filename="$(basename "$1")"
+    full_dest="$2"'/'"$filename"
+
     info "linking '""$1""' to '""$2"
+
     if $LN "$1" "$2"; then
+        echo "$full_dest" >> "$CREATED_LINKS_CACHE"
         return 0
     else
-        error 'cannot create symlink to '"$destination" 
+        error 'cannot create symlink in '"$2" 
         return 1
     fi 
-
-    echo "$destination" >> "$CREATED_LINKS_CACHE"
 }
 
 # create a directory if it doesn't exist and notify the user with the info
@@ -124,7 +127,7 @@ logged_ln() {
 # $1     - the path of the directory to create
 # return - 0 for lack of failure, 1 for failure
 
-create_dir_if_not_exist() {
+create_dir_if_not_exists() {
     if [ ! -d "$1" ]; then
         info "creating '""$1""' to store config files" 
 
@@ -230,6 +233,10 @@ install_config() {
 # is the main driver behind all application configuration installation
 install() {
     for folder in */; do
+        if [ "$folder" = '*' ]; then
+            return 1
+        fi
+
         appname="${folder%/}"
 
         if can_install "$appname"; then
@@ -276,16 +283,11 @@ uninstall() {
 
 ################################################################################
 
-# check the number of arguments
-if [ $# -lt 1 ]; then
-    usage
-    exit 1
-fi
+# print usage info with no args
+if [ $# -lt 1 ]; then usage && exit 1; fi
 
-if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
-    usage
-    exit 0
-fi
+# help shortcut - subcommand processing would ordinarily prevent help flags 
+if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then usage && exit 0; fi
 
 # parse command line options
 subcommand=$1; shift
@@ -302,7 +304,8 @@ while getopts "fvVh" opt; do
             exit 0
         ;;
         ? )
-            error 'unrecognized flag passed in'
+            error 'Unknown option'
+            usage
             exit 1
         ;;
     esac
@@ -314,7 +317,6 @@ if [ "$subcommand" = "install" ]; then
 elif [ "$subcommand" = "uninstall" ]; then
     uninstall
 else
-    error 'unrecognized subcommand! please use a valid subcommand'
-    usage
+    error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."
     exit 1
 fi
