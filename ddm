@@ -118,8 +118,25 @@ logged_ln() {
     echo "$destination" >> "$CREATED_LINKS_CACHE"
 }
 
-guarded_create_dir() {
+# create a directory if it doesn't exist and notify the user with the info
+# command.
+#
+# $1     - the path of the directory to create
+# return - 0 for lack of failure, 1 for failure
 
+create_dir_if_not_exist() {
+    if [ ! -d "$1" ]; then
+        info "creating '""$1""' to store config files" 
+
+        if mkdir -p "$1"; then
+            echo "$1" >> "$CREATED_DIR_CACHE" 
+            return 0
+        else
+            error "could not create install directory '""$1""'"
+            return 1
+        fi
+    fi
+    return 0
 }
 
 ################################################################################
@@ -128,7 +145,10 @@ guarded_create_dir() {
 # looks in the current directory for properly formatted application folder
 # according to spec.
 #
-# $1 - the name of the application to verify
+# $1     - the name of the application to verify
+# return - 0 if the application meets the criterion for install,
+#          1 otherwise
+
 can_install() {
     # locate the installation approval script
     verify_script="$1"'/inst.sh'
@@ -149,7 +169,9 @@ can_install() {
 # `meta` file location in the given application's folder according to the spec.
 # searches current directory.
 #
-# $1 - the name of the application to install
+# $1     - the name of the application to install
+# return - 0 for a successful install, 1 for any error
+
 install_config() {
     # find meta script directory
     meta_script="$1"'/meta'
@@ -162,8 +184,7 @@ install_config() {
         . "$meta_script"
     fi
 
-    # notify user about the installation of the dotfiles for the given application
-    info 'installing dotfiles for "'"$appname"'" to "'"$install_dir"'"'
+    info "installing dotfiles for '""$1""' to '""$install_dir""'"
 
     # make sure config files exist
     conf_files_location="$1"'/conf'
@@ -172,11 +193,8 @@ install_config() {
         return 1
     fi
 
-    # create install dir if it doesn't exist
-    if [ ! -d "$install_dir" ]; then
-        info 'creating installation directory "'"$install_dir"'"'
-        mkdir -p "$install_dir" || { error 'could not create install directory'; return 1; }
-        echo "$install_dir" >> "$CREATED_DIR_CACHE" 
+    if ! create_dir_if_not_exists "$install_dir"; then
+        return 1;
     fi
 
     # intit var for valid configuration files
@@ -208,24 +226,23 @@ install_config() {
 }
 
 # installs all application packages in the given directory by first checking if
-# they can be installed, then runnning the install command on them
+# they can be installed, then runnning the install_config command on them; this
+# is the main driver behind all application configuration installation
 install() {
     for folder in */; do
         appname="${folder%/}"
 
         if can_install "$appname"; then
-            info 'installing '"$appname"
             install_config "$appname"
         else
-            warn 'cannot install '"$appname"
+            warn "skipping '""$appname""'; not applicable"
         fi
     done
 }
 
-# uses the corresponding cache files to remove the installed
-# symlinks and folders, first removing the symlinks, then removing
-# the empty folders that remain (and leaving the ones that aren't
-# empty)
+# uses the corresponding cache files to remove the installed symlinks and
+# folders, first removing the symlinks, then removing the empty folders that
+# remain (and leaving the ones that aren't empty)
 uninstall() {
     # if no cache files exist we should warn the user about it and exit
     if [ ! -f "$CREATED_LINKS_CACHE" ] && [ ! -f "$CREATED_DIR_CACHE" ]; then
@@ -256,6 +273,7 @@ uninstall() {
 
     rm -f "$CREATED_DIR_CACHE" "$CREATED_LINKS_CACHE"
 }
+
 ################################################################################
 
 # check the number of arguments
