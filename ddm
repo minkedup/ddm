@@ -42,6 +42,8 @@ OPTIONS:
 EOF
 }
 
+################################################################################
+
 info() {
     if [ "$VERBOSE" -gt 0 ]; then
         printf '%b[ info ]%b %s\n' "$GRAY" "$WHITE" "$1" 
@@ -56,11 +58,37 @@ error() {
     printf '%b[ erro ]%b %s\n' "$RED" "$WHITE" "$1"
 }
 
-# manual conflict resolution prompt to resolve conflicts
-# with files that exist where a symlink is going to be
-# placed
-# $1 - The location of the file that produced the collision
+################################################################################
+
+# takes a file glob and a directory; returns the files that match that glob in
+# the directory separated by spaces al-la posix sh 'arrays'
+# 
+# $1     - the directory in which to search
+# $2     - the glob to use in the directory
+# return - sh 'array' of the files that match the glob
+
+collect_file_glob() {
+    collected_files=''
+    path_glob="$1"'/'"$2"
+
+    for file in $path_glob; do
+        collected_files="$collected_files"' '"$file"
+    done
+
+    if [ ! "${file# }" = "$path_glob" ]; then
+        printf '%s' "$collected_files"
+    else
+        printf ''
+    fi
+}
+
+# manual conflict resolution prompt to resolve conflicts with files that exist
+# where a symlink is going to be placed
+#
+# $1     - the location of the file that produced the collision
+#              (used for printing purposes)
 # return - 0 for overwrite, 1 for keeping the original
+
 conflict() {
     warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
     choice='y'
@@ -71,9 +99,34 @@ conflict() {
     esac
 }
 
-# takes a given application name and returns whether or not it can
-# be installed; looks in the current directory for properly
-# formatted application folder according to spec.
+# created a symlink with the defined $LN while logging in the designated symlink
+# log file (designated by $CREATED_LINKS_CACHE).
+#
+# $1     - the source directory/file
+# $2     - the destination directory/file
+# return - 0 for link success, 1 for failure
+
+logged_ln() {
+    info "linking '""$1""' to '""$2"
+    if $LN "$1" "$2"; then
+        return 0
+    else
+        error 'cannot create symlink to '"$destination" 
+        return 1
+    fi 
+
+    echo "$destination" >> "$CREATED_LINKS_CACHE"
+}
+
+guarded_create_dir() {
+
+}
+
+################################################################################
+
+# takes a given application name and returns whether or not it can be installed;
+# looks in the current directory for properly formatted application folder
+# according to spec.
 #
 # $1 - the name of the application to verify
 can_install() {
@@ -92,9 +145,9 @@ can_install() {
     return 1
 }
 
-# installs the configuration files for the given input application
-# based on the `meta` file location in the given application's
-# folder according to the spec. searches current directory.
+# installs the configuration files for the given input application based on the
+# `meta` file location in the given application's folder according to the spec.
+# searches current directory.
 #
 # $1 - the name of the application to install
 install_config() {
@@ -129,17 +182,8 @@ install_config() {
     # intit var for valid configuration files
     conf_files=''
 
-    # collect all of the dotfiles that we need to install
-    to_add=''
-    local_dotfiles_glob="$conf_files_location"'/'"$DOTFILES_GLOB"
-    for f in $local_dotfiles_glob; do to_add="$to_add"' '"$f"; done
-    if [ ! "${to_add# }" = "$local_dotfiles_glob" ]; then conf_files="$conf_files""$to_add"; fi
-
-    # collect any additional files that we need to install
-    to_add=''
-    local_otherfiles_glob="$conf_files_location"'/'"*"
-    for f in $local_otherfiles_glob; do to_add="$to_add"' '"$f"; done
-    if [ ! "${to_add# }" = "$local_otherfiles_glob" ]; then conf_files="$conf_files""$to_add"; fi
+    conf_files="$(collect_file_glob "$conf_files_location" "$DOTFILES_GLOB")"
+    conf_files="$conf_files""$(collect_file_glob "$conf_files_location" '*')"
 
     # iterate through files linking to the right location
     for to_copy in $conf_files; do
@@ -147,10 +191,10 @@ install_config() {
         destination="$install_dir"'/'"$to_copy_name"
 
         if [ -e "$destination" ]; then
-            info 'destination "'"$destination"'" already exists - conflict'
+            warn 'destination "'"$destination"'" already exists - conflict'
 
             if [ "$FORCE" -gt 0 ]; then
-                info 'force enabled; skipping "'"$destination"'"'
+                warn 'force enabled; skipping "'"$destination"'"'
             else
                 if ! conflict "$destination"; then
                     info 'skipping "'"$(basename "$to_copy")"'"'
@@ -159,16 +203,12 @@ install_config() {
             fi
         fi
 
-        info 'linking "'"$to_copy_name"'" to "'"$destination"'"'
-        $LN "$to_copy" "$install_dir" || error 'cannot create symlink to '"$destination" 
-
-        echo "$destination" >> "$CREATED_LINKS_CACHE"
+        logged_ln "$to_copy" "$install_dir"
     done
 }
 
-# installs all application packages in the given directory by first
-# checking if they can be installed, then runnning the install
-# command on them
+# installs all application packages in the given directory by first checking if
+# they can be installed, then runnning the install command on them
 install() {
     for folder in */; do
         appname="${folder%/}"
@@ -216,6 +256,7 @@ uninstall() {
 
     rm -f "$CREATED_DIR_CACHE" "$CREATED_LINKS_CACHE"
 }
+################################################################################
 
 # check the number of arguments
 if [ $# -lt 1 ]; then
