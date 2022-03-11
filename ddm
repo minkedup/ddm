@@ -89,7 +89,7 @@ collect_file_glob() {
 #              (used for printing purposes)
 # return - 0 for overwrite, 1 for keeping the original
 
-conflict() {
+prompt_conflict() {
     warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
     choice='y'
     read -r choice
@@ -97,6 +97,28 @@ conflict() {
         [Yy]*) return 0 ;;
         [Nn]*) return 1 ;;
     esac
+}
+
+# pre-emptive conflict detection and elimination function; checks whether or not
+# a file exists at a destination; if the file does exist it prompts the user to
+# overwrite it.
+#
+# $1     - the destination file to check
+# return - 0 for a successful resolution, 1 if a conflict could 
+#          not be resolved and a symlink cannot be created 
+
+detect_resolve_conflict() {
+    if [ -e "$1" ]; then
+        if [ "$FORCE" -gt 0 ]; then
+            warn "force enabled overriding '""$1""' with symlink"
+            return 0
+        else
+            if ! prompt_conflict "$1"; then
+                info "skipping '""$(basename "$to_copy")""'"
+                return 1
+            fi
+        fi
+    fi
 }
 
 # created a symlink with the defined $LN while logging in the designated symlink
@@ -211,17 +233,8 @@ install_config() {
         to_copy_name="$(basename "$to_copy")"
         destination="$install_dir"'/'"$to_copy_name"
 
-        if [ -e "$destination" ]; then
-            warn 'destination "'"$destination"'" already exists - conflict'
-
-            if [ "$FORCE" -gt 0 ]; then
-                warn 'force enabled; skipping "'"$destination"'"'
-            else
-                if ! conflict "$destination"; then
-                    info 'skipping "'"$(basename "$to_copy")"'"'
-                    continue
-                fi
-            fi
+        if ! detect_resolve_conflict "$destination"; then
+            continue
         fi
 
         logged_ln "$to_copy" "$install_dir"
@@ -229,7 +242,7 @@ install_config() {
 }
 
 # installs all application packages in the given directory by first checking if
-# they can be installed, then runnning the install_config command on them; this
+# they can be installed, then running the install_config command on them; this
 # is the main driver behind all application configuration installation
 install() {
     for folder in */; do
@@ -283,7 +296,7 @@ uninstall() {
 
 ################################################################################
 
-# print usage info with no args
+# print usage info with no arguments 
 if [ $# -lt 1 ]; then usage && exit 1; fi
 
 # help shortcut - subcommand processing would ordinarily prevent help flags 
