@@ -11,6 +11,9 @@ DOTFILES_GLOB='.[!.]*'
 CREATED_DIR_CACHE='.created_dirs'
 CREATED_LINKS_CACHE='.created_links'
 
+CURRENT_DIR_CACHE=''
+CURRENT_LINKS_CACHE=''
+
 RED='\e[31m'
 BOLD='\e[1m'
 GRAY='\e[90m'
@@ -59,6 +62,34 @@ error() {
 }
 
 ################################################################################
+
+# reads a file into a string array that is 'returned' with printf; reads the
+# file by newlines and replaces those with spaces. files read by this function
+# should not contain spaces per line.
+#
+# $1     - the file to read into an array
+# return - the string array via stdout/printf
+file_to_array() {
+    # very lazy approach - please replace
+    filtered_content="$(tr '\n' ' ' < "$1")"
+
+    printf '%s' "$filtered_content"
+}
+
+# checks whether or not the a string is in an sh array (space seperated string)
+#
+# $1     - the array in which to search
+# $2     - the string to search for in the array
+# return - 0 if the string is in the array, 1 otherwise
+
+string_in_array() {
+    for element in $1; do
+        if [ "$2" = "$element" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 # takes a file glob and a directory; returns the files that match that glob in
 # the directory separated by spaces al-la posix sh 'arrays'
@@ -124,8 +155,8 @@ detect_resolve_conflict() {
 # created a symlink with the defined $LN while logging in the designated symlink
 # log file (designated by $CREATED_LINKS_CACHE).
 #
-# $1     - the source directory/file
-# $2     - the destination directory/file
+# $1     - the source file
+# $2     - the destination directory
 # return - 0 for link success, 1 for failure
 
 logged_ln() {
