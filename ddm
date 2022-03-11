@@ -140,12 +140,17 @@ prompt_conflict() {
 
 detect_resolve_conflict() {
     if [ -e "$1" ]; then
+        if string_in_array "$CURRENT_LINKS_CACHE" "$1"; then
+            info "skipping '""$(basename "$1")""'; already installed"
+            return 1
+        fi
+
         if [ "$FORCE" -gt 0 ]; then
             warn "force enabled overriding '""$1""' with symlink"
             return 0
         else
             if ! prompt_conflict "$1"; then
-                info "skipping '""$(basename "$to_copy")""'"
+                info "skipping '""$(basename "$1")""'"
                 return 1
             fi
         fi
@@ -182,7 +187,7 @@ logged_ln() {
 
 create_dir_if_not_exists() {
     if [ ! -d "$1" ]; then
-        info "creating '""$1""' to store config files" 
+        info "creating directory '""$1""' to store config files" 
 
         if mkdir -p "$1"; then
             echo "$1" >> "$CREATED_DIR_CACHE" 
@@ -196,6 +201,18 @@ create_dir_if_not_exists() {
 }
 
 ################################################################################
+
+# loads cache files into the global variables for the associated cache files
+
+load_cache_files() {
+    if [ -e "$CREATED_DIR_CACHE" ]; then
+        CURRENT_DIR_CACHE="$(file_to_array "$CREATED_DIR_CACHE")"
+    fi
+
+    if [ -e "$CREATED_LINKS_CACHE" ]; then
+        CURRENT_LINKS_CACHE="$(file_to_array "$CREATED_LINKS_CACHE")"
+    fi
+}
 
 # takes a given application name and returns whether or not it can be installed;
 # looks in the current directory for properly formatted application folder
@@ -276,6 +293,9 @@ install_config() {
 # they can be installed, then running the install_config command on them; this
 # is the main driver behind all application configuration installation
 install() {
+    # load the cache file contents for redundancy checking
+    load_cache_files
+
     for folder in */; do
         if [ "$folder" = '*' ]; then
             return 1
