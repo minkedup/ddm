@@ -4,7 +4,7 @@ VERSION='0.0.1'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
-RMDIR='rmdir --ignore-fail-on-non-empty'
+RMDIR='rmdir --parents --ignore-fail-on-non-empty'
 
 DOTFILES_GLOB='.[!.]*'
 
