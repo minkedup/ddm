@@ -79,25 +79,3 @@ root_dir="$HOME/.kitty"
 *Instead of being installed in the default (*`$HOME/.config/kitty`*), the kitty
 application configuration files will instead be installed in the home directory
 under the name* "`.kitty`".
-
-## The Backstory 
-
-In the past I had used `stow` to manage my dotfiles and was fairly satisfied
-with that solution. It would handily symlink everything for me, and all I needed
-to do was give it a folder with my configurations in it. But this choice began
-to butt-up against my needs. While `stow` is certainly a capable program, I ran
-into several issues when using it:
-
-- File Conflicts
-    - Handling existing conflicts was a nightmare; I had to rewrite my own
-      `Makefile` to avoid them.
-- Dependencies
-    - `stow` can be built easily on nearly any machine, props to the developers.
-      However, I often use machines where the only dependencies that I can rely
-      on are `git` and `bash`/`sh`. I want to use a program that can work in the
-      as many environments as possible.
-
-So, why did I end up building my own system instead of using one of the already
-existing systems? My reasoning was that I had already used scripts to plan
-`stow`'s misgivings, so I might as well go all the way and write a dotfile
-manager in POSIX `sh`.
