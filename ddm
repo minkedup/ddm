@@ -45,44 +45,88 @@ OPTIONS:
 EOF
 }
 
-################################################################################
+############################## OUTPUT ##############################  
 
+##
+# prints info to the user if the global flag $VERBOSE is set
+#
+# @1 - the message to display to the user 
+##
 info() {
     if [ "$VERBOSE" -gt 0 ]; then
         printf '%b[ info ]%b %s\n' "$GRAY" "$WHITE" "$1" 
     fi
 }
 
+##
+# warns the user that something may be wrong 
+#
+# @1 - the message to warn the user
+##
 warn() {
     printf '%b[ warn ]%b %s\n' "$YELLO" "$WHITE" "$1"
 }
 
+##
+# displays an error to the user in red
+#
+# @1 - the error message to display
+##
 error() {
     printf '%b[ erro ]%b %s\n' "$RED" "$WHITE" "$1"
 }
 
-################################################################################
-
-# reads a file into a string array that is 'returned' with printf; reads the
-# file by newlines and replaces those with spaces. files read by this function
-# should not contain spaces per line.
+##
+# prompts the user to resolve a file conflict
 #
-# $1     - the file to read into an array
-# return - the string array via stdout/printf
+# the function prompts the user to overwrite a file, allowing the user to
+# respond with Y\N with Y as a default. the function returns true if the user
+# would like to overwrite the file, and false otherwise.
+#
+# @1      - the name of the file to prompt the user to overwrite 
+# @return - true for overwrite, false for keeping the original
+##
+prompt_conflict() {
+    warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
+    choice='y'
+    read -r choice
+    case $choice in
+        [Yy]*) return 0 ;;
+        [Nn]*) return 1 ;;
+    esac
+}
+
+############################## UTILITY ##############################  
+
+#################### ARRAYS ####################  
+
+##
+# reads the given file into a space-separated string 'array'
+#
+# the function reads the given file into a string, replacing every encountered
+# newline with a space. note: any spaces in the file will be interpreted as a
+# new element in the 'array' 
+#
+# @1      - the file to read into an 'array'
+# @return - the string 'array'
+##
 file_to_array() {
-    # very lazy approach - please replace
     filtered_content="$(tr '\n' ' ' < "$1")"
 
     printf '%s' "$filtered_content"
 }
 
-# checks whether or not the a string is in an sh array (space seperated string)
+##
+# checks whether or not a string is in an 'array'
 #
-# $1     - the array in which to search
-# $2     - the string to search for in the array
-# return - 0 if the string is in the array, 1 otherwise
-
-string_in_array() {
+# the function iterates through an 'array' of space separated elements and
+# returns whether or not the given string is equal to any element in the 'array'
+#
+# @1      - the 'array' in which to search
+# @2      - the string to search for in the 'array'
+# @return - 0 if the string is in the 'array', 1 otherwise
+##
+in_array() {
     for element in $1; do
         if [ "$2" = "$element" ]; then
             return 0
@@ -91,13 +135,14 @@ string_in_array() {
     return 1
 }
 
-# takes a file glob and a directory; returns the files that match that glob in
-# the directory separated by spaces al-la posix sh 'arrays'
+##
+# takes a file glob and a directory and returns the files that match the glob
+# in the directory in the form of a space separated string.
 # 
-# $1     - the directory in which to search
-# $2     - the glob to use in the directory
-# return - sh 'array' of the files that match the glob
-
+# @1      - the directory in which to search
+# @2      - the glob to use in the directory
+# @return - sh 'array' of the files that match the glob
+##
 collect_file_glob() {
     collected_files=''
     path_glob="$1"'/'"$2"
@@ -113,34 +158,23 @@ collect_file_glob() {
     fi
 }
 
-# manual conflict resolution prompt to resolve conflicts with files that exist
-# where a symlink is going to be placed
+#################### FILE SYSTEM ####################  
+
+##
+# preemptive conflict detection and resolution
 #
-# $1     - the location of the file that produced the collision
-#              (used for printing purposes)
-# return - 0 for overwrite, 1 for keeping the original
-
-prompt_conflict() {
-    warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
-    choice='y'
-    read -r choice
-    case $choice in
-        [Yy]*) return 0 ;;
-        [Nn]*) return 1 ;;
-    esac
-}
-
-# pre-emptive conflict detection and elimination function; checks whether or not
-# a file exists at a destination; if the file does exist it prompts the user to
-# overwrite it.
+# the function first checks whether or not a file exists at a given
+# destination. if the file does exist, it then checks the global $FORCE flag
+# and returns true if it's set. otherwise, it prompts the user to overwrite it,
+# returning true if the user would like to overwrite it, otherwise returning
+# false. 
 #
-# $1     - the destination file to check
-# return - 0 for a successful resolution, 1 if a conflict could 
-#          not be resolved and a symlink cannot be created 
-
-detect_resolve_conflict() {
+# @1      - the destination file to check
+# @return - 0 for a successful resolution, 1 if a conflict could 
+##
+resolve_file_conflict() {
     if [ -e "$1" ]; then
-        if string_in_array "$CURRENT_LINKS_CACHE" "$1"; then
+        if in_array "$CURRENT_LINKS_CACHE" "$1"; then
             info "skipping '""$(basename "$1")""'; already installed"
             return 1
         fi
@@ -157,13 +191,17 @@ detect_resolve_conflict() {
     fi
 }
 
-# created a symlink with the defined $LN while logging in the designated symlink
-# log file (designated by $CREATED_LINKS_CACHE).
+##
+# create a symlink with the globally defined $LN
 #
-# $1     - the source file
-# $2     - the destination directory
-# return - 0 for link success, 1 for failure
-
+# the function links a given source to a given destination, logging the
+# operation to the console for the user to read as well as logging the created
+# destination to ddm's cache files for later removals.
+#
+# @1      - source file's path 
+# @2      - the destination path 
+# @return - 0 for link success, 1 for failure
+##
 logged_ln() {
     filename="$(basename "$1")"
     full_dest="$2"'/'"$filename"
@@ -179,12 +217,16 @@ logged_ln() {
     fi 
 }
 
-# create a directory if it doesn't exist and notify the user with the info
-# command.
+##
+# create a directory if it doesn't exist already
 #
-# $1     - the path of the directory to create
-# return - 0 for lack of failure, 1 for failure
-
+# the function creates a directory if it doesn't exist, logging the newly
+# created directory in ddm's cache files for later removals. the function
+# notifies the user that it has created a new directory.
+#
+# @1      - the path of the directory to create
+# @return - 0 on success, 1 for creation failure
+##
 create_dir_if_not_exists() {
     if [ ! -d "$1" ]; then
         info "creating directory '""$1""' to store config files" 
@@ -200,10 +242,11 @@ create_dir_if_not_exists() {
     return 0
 }
 
-################################################################################
+#################### FUNCTIONALITY ####################  
 
-# loads cache files into the global variables for the associated cache files
-
+##
+# loads cache files into the global variables for the cache files
+##
 load_cache_files() {
     if [ -e "$CREATED_DIR_CACHE" ]; then
         CURRENT_DIR_CACHE="$(file_to_array "$CREATED_DIR_CACHE")"
@@ -214,16 +257,21 @@ load_cache_files() {
     fi
 }
 
-# takes a given application name and returns whether or not it can be installed;
-# looks in the current directory for properly formatted application folder
-# according to spec.
+##
+# takes a given application name and returns whether or not it is a valid
+# installation candidate 
 #
-# $1     - the name of the application to verify
-# return - 0 if the application meets the criterion for install,
-#          1 otherwise
-
+# the function looks for an executable inst.sh file in the application directory
+# relative to the current directory; if it finds the file, the function runs it
+# with the global $SH, and returns its return value. otherwise, the function
+# checks whether or not the application name is in the $PATH, and returns false
+# if it cannot be found.
+#
+# @1      - the name of the application to verify
+# @return - 0 if the application meets the criterion for install,
+#           1 otherwise
+##
 can_install() {
-    # locate the installation approval script
     verify_script="$1"'/inst.sh'
 
     if [ -x "$verify_script" ]; then
@@ -238,13 +286,16 @@ can_install() {
     return 1
 }
 
-# installs the configuration files for the given input application based on the
-# `meta` file location in the given application's folder according to the spec.
-# searches current directory.
+##
+# installs an application with its installation properties
 #
-# $1     - the name of the application to install
-# return - 0 for a successful install, 1 for any error
-
+# the function sets up default installation properties, then allows the
+# application's meta file to override them; the function then installs the
+# application
+#
+# @1      - the name of the application to install
+# @return - 0 for a successful install, 1 for any error
+##
 install_config() {
     # find meta script directory
     meta_script="$1"'/meta'
@@ -266,13 +317,16 @@ install_config() {
         return 1
     fi
 
+    # create/check existence of install directory
     if ! create_dir_if_not_exists "$install_dir"; then
         return 1;
     fi
 
-    # intit var for valid configuration files
+    # init var for valid configuration files
     conf_files=''
 
+    # normally globs don't match dotfiles - so we need two passes, once to 
+    # pick up the dotfiles, another to pick up any other files
     conf_files="$(collect_file_glob "$conf_files_location" "$DOTFILES_GLOB")"
     conf_files="$conf_files""$(collect_file_glob "$conf_files_location" '*')"
 
@@ -281,7 +335,7 @@ install_config() {
         to_copy_name="$(basename "$to_copy")"
         destination="$install_dir"'/'"$to_copy_name"
 
-        if ! detect_resolve_conflict "$destination"; then
+        if ! resolve_file_conflict "$destination"; then
             continue
         fi
 
@@ -289,9 +343,13 @@ install_config() {
     done
 }
 
+############################## SUBCOMMANDS ##############################  
+
+##
 # installs all application packages in the given directory by first checking if
 # they can be installed, then running the install_config command on them; this
 # is the main driver behind all application configuration installation
+##
 install() {
     # load the cache file contents for redundancy checking
     load_cache_files
@@ -345,7 +403,7 @@ uninstall() {
     rm -f "$CREATED_DIR_CACHE" "$CREATED_LINKS_CACHE"
 }
 
-################################################################################
+############################## CLI PROCESSING ##############################  
 
 # print usage info with no arguments 
 if [ $# -lt 1 ]; then usage && exit 1; fi
