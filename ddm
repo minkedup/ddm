@@ -8,11 +8,13 @@ RMDIR='rmdir --parents --ignore-fail-on-non-empty'
 
 DOTFILES_GLOB='.[!.]*'
 
-CREATED_DIR_CACHE='.created_dirs'
-CREATED_LINKS_CACHE='.created_links'
+IGNORED_GLOBS_FILE='.ddmignore'
+CREATED_DIRS_CACHE_FILE='.created_dirs'
+CREATED_LINKS_CACHE_FILE='.created_links'
 
-CURRENT_DIR_CACHE=''
-CURRENT_LINKS_CACHE=''
+IGNORED_GLOBS=''
+CREATED_DIRS_CACHE=''
+CREATED_LINKS_CACHE=''
 
 RED='\e[31m'
 BOLD='\e[1m'
@@ -24,6 +26,12 @@ YELLO='\e[33m'
 VERBOSE=0
 FORCE=0
 
+
+############################## OUTPUT ##############################  
+
+##
+# print usage information to the user
+##
 usage() {
 cat << EOF
 ddm version $VERSION
@@ -44,8 +52,6 @@ OPTIONS:
     -h    Show this help
 EOF
 }
-
-############################## OUTPUT ##############################  
 
 ##
 # prints info to the user if the global flag $VERBOSE is set
@@ -97,6 +103,23 @@ prompt_conflict() {
 }
 
 ############################## UTILITY ##############################  
+
+#################### STRING ####################  
+
+##
+# determines whether or not a given string starts with a substr 
+#
+# @1      - the subtr to look for at the begining
+# @2      - the string in which to search
+# @return - true if the string starts with the substr, false otherwise
+##
+starts_with() {
+    res="$(echo "$2" | grep -Eo '^'"$1")"
+    if [ -n "$res" ]; then
+        return 0
+    fi
+    return 1
+}
 
 #################### ARRAYS ####################  
 
@@ -174,7 +197,7 @@ collect_file_glob() {
 ##
 resolve_file_conflict() {
     if [ -e "$1" ]; then
-        if in_array "$CURRENT_LINKS_CACHE" "$1"; then
+        if in_array "$CREATED_LINKS_CACHE" "$1"; then
             info "skipping '""$(basename "$1")""'; already installed"
             return 1
         fi
@@ -209,7 +232,7 @@ logged_ln() {
     info "linking '""$1""' to '""$2"
 
     if $LN "$1" "$2"; then
-        echo "$full_dest" >> "$CREATED_LINKS_CACHE"
+        echo "$full_dest" >> "$CREATED_LINKS_CACHE_FILE"
         return 0
     else
         error 'cannot create symlink in '"$2" 
@@ -232,7 +255,7 @@ create_dir_if_not_exists() {
         info "creating directory '""$1""' to store config files" 
 
         if mkdir -p "$1"; then
-            echo "$1" >> "$CREATED_DIR_CACHE" 
+            echo "$1" >> "$CREATED_DIRS_CACHE_FILE" 
             return 0
         else
             error "could not create install directory '""$1""'"
@@ -245,15 +268,19 @@ create_dir_if_not_exists() {
 #################### FUNCTIONALITY ####################  
 
 ##
-# loads cache files into the global variables for the cache files
+# load persistent files into memory for easier processing
 ##
-load_cache_files() {
-    if [ -e "$CREATED_DIR_CACHE" ]; then
-        CURRENT_DIR_CACHE="$(file_to_array "$CREATED_DIR_CACHE")"
+load_persistent_files() {
+    if [ -e "$CREATED_DIRS_CACHE_FILE" ]; then
+        CREATED_DIRS_CACHE="$(file_to_array "$CREATED_DIRS_CACHE_FILE")"
     fi
 
-    if [ -e "$CREATED_LINKS_CACHE" ]; then
-        CURRENT_LINKS_CACHE="$(file_to_array "$CREATED_LINKS_CACHE")"
+    if [ -e "$CREATED_LINKS_CACHE_FILE" ]; then
+        CREATED_LINKS_CACHE="$(file_to_array "$CREATED_LINKS_CACHE_FILE")"
+    fi
+
+    if [ -e "$IGNORED_GLOBS_FILE" ]; then
+        IGNORED_GLOBS="$(file_to_array "$IGNORED_GLOBS_FILE")"
     fi
 }
 
@@ -351,8 +378,7 @@ install_config() {
 # is the main driver behind all application configuration installation
 ##
 install() {
-    # load the cache file contents for redundancy checking
-    load_cache_files
+    load_persistent_files
 
     for folder in */; do
         if [ "$folder" = '*' ]; then
@@ -376,15 +402,15 @@ install() {
 ##
 uninstall() {
     # if no cache files exist we should warn the user about it and exit
-    if [ ! -f "$CREATED_LINKS_CACHE" ] && [ ! -f "$CREATED_DIR_CACHE" ]; then
+    if [ ! -f "$CREATED_LINKS_CACHE_FILE" ] && [ ! -f "$CREATED_DIRS_CACHE_FILE" ]; then
         warn 'cache files do not exist; are you sure you installed?'
         return 1
     fi
 
     # remove cached created symlinks
-    if [ -f "$CREATED_LINKS_CACHE" ]; then
+    if [ -f "$CREATED_LINKS_CACHE_FILE" ]; then
         # shellcheck disable=SC2013
-        for created_symlink in $(cat "$CREATED_LINKS_CACHE"); do
+        for created_symlink in $(cat "$CREATED_LINKS_CACHE_FILE"); do
             if [ -e "$created_symlink" ]; then
                 info 'removing symlink "'"$created_symlink"'"'
                 rm "$created_symlink"
@@ -394,15 +420,15 @@ uninstall() {
 
 
     # remove empty created folders
-    if [ -f "$CREATED_DIR_CACHE" ]; then
+    if [ -f "$CREATED_DIRS_CACHE_FILE" ]; then
         # shellcheck disable=SC2013
-        for created_folder in $(cat "$CREATED_DIR_CACHE"); do
+        for created_folder in $(cat "$CREATED_DIRS_CACHE_FILE"); do
             info 'removing directory "'"$created_folder"'" if empty'
             $RMDIR "$created_folder"
         done
     fi
 
-    rm -f "$CREATED_DIR_CACHE" "$CREATED_LINKS_CACHE"
+    rm -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_LINKS_CACHE_FILE"
 }
 
 ############################## CLI PROCESSING ##############################  
