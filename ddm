@@ -114,7 +114,12 @@ prompt_conflict() {
 # @return - true if the string starts with the substr, false otherwise
 ##
 starts_with() {
-    res="$(echo "$2" | grep -Eo '^'"$1")"
+    # match at the start of a line
+    find_regex='^'"$1"
+
+    res="$(echo "$2" | grep -Eo "$find_regex")"
+
+    # empty response is no match
     if [ -n "$res" ]; then
         return 0
     fi
@@ -314,6 +319,27 @@ can_install() {
 }
 
 ##
+# takes a file/directory name and returns whether or not it's in any of the
+# ddmignore matches.
+#
+# @1      - the directory/file name to check against
+# @return - 0 if the directory should be ignored, 1 otherwise 
+##
+is_ignored() {
+    # shortcut - if there is no cache everything matches
+    if [ -z "$IGNORED_GLOBS" ]; then
+        return 1
+    fi
+
+    for ignore in $IGNORED_GLOBS; do
+        if starts_with "$ignore" "$1"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+##
 # installs an application with its installation properties
 #
 # the function sets up default installation properties, then allows the
@@ -386,6 +412,11 @@ install() {
         fi
 
         appname="${folder%/}"
+
+        if is_ignored "$folder"; then
+            warn "skipping '""$appname""'; ddmignore"
+            continue
+        fi
 
         if can_install "$appname"; then
             install_config "$appname"
