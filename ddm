@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.1.1'
+VERSION='0.1.2'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
@@ -413,7 +413,7 @@ install() {
         appname="${folder%/}"
 
         if is_ignored "$folder"; then
-            warn "skipping '""$appname""'; ddmignore"
+            info "skipping '""$appname""'; excluded in ddmignore"
             continue
         fi
 
