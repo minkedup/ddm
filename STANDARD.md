@@ -11,9 +11,49 @@ flexibility in configuration.
 ## Directory Layout
 
 Each application should have a directory named after it in the top level
-directory of the user's dotfiles. This is optional to the extent that `ddm` will
-indiscriminately attempt to install files in the subdirectories of the directory
-in which it is run.
+directory of the user's dotfiles. This convention can be ignored, and should
+only be followed in the case that you would like `ddm` to automatically
+determine whether or not the configuration files are ready for installation.
+
+### .ddmignore file
+
+To allow users to have directories that are not dedicated to configuration files
+in their dotfiles directory, `ddm` supports ignoring files based on pattern
+matching. Users familiar with basic `.gitignore` file syntax should find
+`.ddmignore` files familiar.
+
+`.ddmignore` files should consist of a line-separated list of patterns to
+exclude when looking for application configurations. Each pattern will be
+matched against every directory that `ddm` encounters: if the pattern matches
+starting from the beginning of the directory name, `ddm` will skip that
+directory.
+
+Behind the scenes, `ddm` inserts a `^` before each file name to check, then uses
+`grep -E` to perform a regex using the pattern. Thus, savvy users may wish to use
+more advanced regex patterns when writing a `.ddmignore` file. 
+
+For example, we'll consider a directory of application configurations where the
+user has created a directory named `bin` which they would like to be excluded
+from `ddm`.
+
+```
+dotfiles
+├── .ddmignore
+├── bar
+├── bin
+└── foo
+```
+
+```sh
+# an example exclude statement
+$ cat .ddmignore
+
+bin/
+```
+
+Please note that like all other facets of `ddm`, the `.ddmignore` parsing
+doesn't support spaces because it uses a space separated string in the
+background when doing comparisons. 
 
 ## Install Go-Ahead 
 
