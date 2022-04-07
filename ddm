@@ -369,9 +369,11 @@ install() {
     done
 }
 
+##
 # uses the corresponding cache files to remove the installed symlinks and
 # folders, first removing the symlinks, then removing the empty folders that
 # remain (and leaving the ones that aren't empty)
+##
 uninstall() {
     # if no cache files exist we should warn the user about it and exit
     if [ ! -f "$CREATED_LINKS_CACHE" ] && [ ! -f "$CREATED_DIR_CACHE" ]; then
