@@ -2,27 +2,35 @@
 
 ## Introduction
 
-The standard heavily relies on the user's familiarity with text files and text
-editing. To summarize the standard, metadata files are placed in a directory
-with the target application's name; these metadata files contain settings that
-pertaining to installation, and are evaluated as shell scripts to allow
-flexibility in configuration.
+This core unit that `ddm` works with is called a configuration pack, abbreviated
+as `conf-pack` for short. A configuration pack contains metadata for how to
+install configuration files, coupled with configuration files. Each
+configuration pack should target one application, but the standard is flexible
+enough to accommodate non-standard configurations.
 
-## Directory Layout
+The following sections describe how a configuration pack's directory should be
+laid out, as well as how `ddm` will process this layout.
 
-Each application should have a directory named after it in the top level
-directory of the user's dotfiles. This convention can be ignored, and should
-only be followed in the case that you would like `ddm` to automatically
-determine whether or not the configuration files are ready for installation.
+## The Pack Directory 
+
+`ddm` works within a pack directory when processing installations. Each
+application should have a configuration pack named after it in the pack
+directory by convention.
+
+When `ddm` is first run, it treats the current directory as a pack directory,
+iterating through every directory in the current directory and processing it as
+a configuration pack. Users may have folders that they wish to exclude from
+being processed as a configuration pack. `ddm` supports the ignoring folders
+with a `.ddmignore` file.
 
 ### .ddmignore file
 
-To allow users to have directories that are not dedicated to configuration files
-in their dotfiles directory, `ddm` supports ignoring files based on pattern
-matching. Users familiar with basic `.gitignore` file syntax should find
-`.ddmignore` files familiar.
+To allow users to have directories that are not configuration packs in their
+pack directory, `ddm` supports ignoring files based on pattern matching. Users
+familiar with basic `.gitignore` file syntax should find `.ddmignore` files
+familiar.
 
-`.ddmignore` files should consist of a line-separated list of patterns to
+`.ddmignore` files should consist of a newline separated list of patterns to
 exclude when looking for application configurations. Each pattern will be
 matched against every directory that `ddm` encounters: if the pattern matches
 starting from the beginning of the directory name, `ddm` will skip that
@@ -30,11 +38,12 @@ directory.
 
 Behind the scenes, `ddm` inserts a `^` before each file name to check, then uses
 `grep -E` to perform a regex using the pattern. Thus, savvy users may wish to use
-more advanced regex patterns when writing a `.ddmignore` file. 
+more advanced regex patterns when writing a `.ddmignore` file.
 
-For example, we'll consider a directory of application configurations where the
-user has created a directory named `bin` which they would like to be excluded
-from `ddm`.
+**Example**
+
+For example, we'll consider a pack directory in which a user has created a
+configuration pack named `bin` which they would like to be excluded from `ddm`.
 
 ```
 dotfiles
@@ -51,49 +60,54 @@ $ cat .ddmignore
 bin/
 ```
 
-Please note that like all other facets of `ddm`, the `.ddmignore` parsing
-doesn't support spaces because it uses a space separated string in the
-background when doing comparisons. 
+Please note that `.ddmignore` files don't support spaces. 
 
-## Install Go-Ahead 
+## Configuration Packs
 
-Each application may include an `isnt.sh` script. This script will return 0 to
-signal that the application's configuration files should be installed;
-otherwise, the script will return any non-zero return code (i.e. a failure
-code). This script will be called by `ddm` when it evaluates a configuration for
-installation. 
+### Install Checking 
 
-In the event that an application does not include an `inst.sh` script, the
-application will be installed dependent on whether or not the application exists
-using the standard `command -v $(application_name)`.
+Each application configuration may include an `isnt.sh` script. This script will
+return true (0) to signal that the configuration files should be installed;
+otherwise, the script will return any non-zero return code to indicate that the
+configuration files should not be installed. This script will be called by `ddm`
+when it evaluates a configuration for installation. 
 
-## Install Configuration
+In the event that an application configuration does not include an `inst.sh`
+script, the configuration files will be installed dependent on whether or not
+the application exists using the standard `command -v $(application_name)` (the
+application_name being derived from the name of the directory of the
+configuration pack).
+
+**NOTE - the** `inst.sh` **script must be executable!**
+
+### Install Properties
 
 Each application may include a `meta` file; this file will contain a variety of
-key-value pairs used by `ddm` to evaluate installation properties. A reference
-is included at the end of this section with each key and its default value, as
-well as a short description of how that variable will change `ddm`'s behavior. 
+key-value pairs used by `ddm` to setup installation properties. A reference is
+included at the end of this section with each key and its default value, as well
+as a short description of how that variable effects `ddm`'s install behavior. 
 
 The `meta` file can be treated like a normal `sh` script, and should have access
 to any environment variable that an `sh` script would normally have access to.
-In addition to these environment variables, the `meta` file will also be passed
-custom variables from `ddm`. A reference listing of what the value of these
-variables mean can also be found at the end of this section.
+In addition to the normal environment variables, the `meta` file will also be
+passed custom variables from `ddm`. A reference listing of what the value of
+these variables mean can also be found at the end of this section.
 
 **NOTE - the** `meta` **script must be executable!**
 
-### Installation Properties
+#### Installation Properties
 ```
 install_dir
     description: the directory to install the conf files to
     default: $HOME/.config/<application_name>
+    value: string
 ```
 
-### Installation Variables
+#### Installation Variables
 
 **⛔Coming Soon ⛔**
 
-## Example Configurations 
+### Example Configuration Pack
 
 Listed below is an example of a configuration for an application named `meow`
 that has decided to forgo the default installation properties in favor of a
