@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.1.2'
+VERSION='0.1.3'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
@@ -188,6 +188,19 @@ collect_file_glob() {
 #################### FILE SYSTEM ####################  
 
 ##
+# abstraction over caching the creation of a file/directory 
+#
+# @1 - the newly created file/directory to log
+##
+log_creation() {
+    if [ -d "$1" ]; then
+        echo "$1" >> "$CREATED_DIRS_CACHE_FILE" 
+    else
+        echo "$1" >> "$CREATED_LINKS_CACHE_FILE"
+    fi
+}
+
+##
 # preemptive conflict detection and resolution
 #
 # the function first checks whether or not a file exists at a given
@@ -236,7 +249,7 @@ logged_ln() {
     info "linking '""$1""' to '""$2"
 
     if $LN "$1" "$2"; then
-        echo "$full_dest" >> "$CREATED_LINKS_CACHE_FILE"
+        log_creation "$full_dest"
         return 0
     else
         error 'cannot create symlink in '"$2" 
@@ -259,7 +272,7 @@ create_dir_if_not_exists() {
         info "creating directory '""$1""' to store config files" 
 
         if mkdir -p "$1"; then
-            echo "$1" >> "$CREATED_DIRS_CACHE_FILE" 
+            log_creation "$1"
             return 0
         else
             error "could not create install directory '""$1""'"
@@ -453,8 +466,15 @@ uninstall() {
     if [ -f "$CREATED_DIRS_CACHE_FILE" ]; then
         # shellcheck disable=SC2013
         for created_folder in $(cat "$CREATED_DIRS_CACHE_FILE"); do
-            info 'removing directory "'"$created_folder"'" if empty'
+            # attempt to remove
             $RMDIR "$created_folder"
+
+            # check if remove worked and inform user
+            if [ -d "$created_folder" ]; then
+                warn 'could not remove directory "'"$created_folder"'"; not empty'
+            else
+                info 'removed directory "'"$created_folder"'"'
+            fi
         done
     fi
 
