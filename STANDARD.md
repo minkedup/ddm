@@ -31,10 +31,9 @@ familiar with basic `.gitignore` file syntax should find `.ddmignore` files
 familiar.
 
 `.ddmignore` files should consist of a newline separated list of patterns to
-exclude when looking for application configurations. Each pattern will be
-matched against every directory that `ddm` encounters: if the pattern matches
-starting from the beginning of the directory name, `ddm` will skip that
-directory.
+exclude when looking for configuration packs. Each pattern will be matched
+against every directory that `ddm` encounters: if the pattern matches starting
+from the beginning of the directory name, `ddm` will skip that directory.
 
 Behind the scenes, `ddm` inserts a `^` before each file name to check, then uses
 `grep -E` to perform a regex using the pattern. Thus, savvy users may wish to use
@@ -64,28 +63,37 @@ Please note that `.ddmignore` files don't support spaces.
 
 ## Configuration Packs
 
+### Configuration Files
+
+Each configuration pack must include a sub directory named `conf` that contains
+the configuration files for the application that the configuration package is
+targeting. More information about how `ddm` installs these configuration files
+can be found under the [installation properties](#installation-properties)
+section.
+
 ### Install Checking 
 
-Each application configuration may include an `isnt.sh` script. This script will
+Each configuration pack may include an `isnt.sh` script. This script will
 return true (0) to signal that the configuration files should be installed;
 otherwise, the script will return any non-zero return code to indicate that the
 configuration files should not be installed. This script will be called by `ddm`
 when it evaluates a configuration for installation. 
 
-In the event that an application configuration does not include an `inst.sh`
-script, the configuration files will be installed dependent on whether or not
-the application exists using the standard `command -v $(application_name)` (the
-application_name being derived from the name of the directory of the
+In the event that an configuration pack does not include an `inst.sh` script,
+the configuration files will be installed dependent on whether or not the
+application exists using the standard `command -v $(application_name)` (the
+`$application_name` being derived from the name of the directory of the
 configuration pack).
 
 **NOTE - the** `inst.sh` **script must be executable!**
 
 ### Install Properties
 
-Each application may include a `meta` file; this file will contain a variety of
-key-value pairs used by `ddm` to setup installation properties. A reference is
-included at the end of this section with each key and its default value, as well
-as a short description of how that variable effects `ddm`'s install behavior. 
+Each configuration pack may include a `meta` file; this file will contain a
+variety of key-value pairs used by `ddm` to setup installation properties. A
+reference is included at the end of this section with each key and its default
+value, as well as a short description of how that variable effects `ddm`'s
+install behavior. 
 
 The `meta` file can be treated like a normal `sh` script, and should have access
 to any environment variable that an `sh` script would normally have access to.
