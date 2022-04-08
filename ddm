@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.1.4'
+VERSION='0.2.0'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
@@ -206,15 +206,35 @@ collect_file_glob() {
 #################### FILE SYSTEM ####################  
 
 ##
+# correct a given path with an offset to the root level directory
+#
+# @1      - the path to correct
+# @return - the corrected path 
+##
+submodule_path_correct() {
+    if [ -z "$DDM" ]; then
+        printf '%s' "$1"
+    else
+        num_above=$((DDM+1))
+        above_relpath="$(repeat_str "$num_above" '../')"
+
+        printf '%s%s' "$above_relpath" "$1"
+    fi
+}
+
+##
 # abstraction over caching the creation of a file/directory 
 #
 # @1 - the newly created file/directory to log
 ##
 log_creation() {
+    offset_dirs_file="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
+    offset_links_file="$(submodule_path_correct "$CREATED_LINKS_CACHE_FILE")"
+
     if [ -d "$1" ]; then
-        echo "$1" >> "$CREATED_DIRS_CACHE_FILE" 
+        echo "$1" >> "$offset_dirs_file" 
     else
-        echo "$1" >> "$CREATED_LINKS_CACHE_FILE"
+        echo "$1" >> "$offset_links_file"
     fi
 }
 
@@ -306,12 +326,15 @@ create_dir_if_not_exists() {
 # load persistent files into memory for easier processing
 ##
 load_persistent_files() {
-    if [ -e "$CREATED_DIRS_CACHE_FILE" ]; then
-        CREATED_DIRS_CACHE="$(file_to_array "$CREATED_DIRS_CACHE_FILE")"
+    created_dirs_offset="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
+    created_links_offset="$(submodule_path_correct "$CREATED_LINKS_CACHE_FILE")"
+
+    if [ -e "$created_dirs_offset" ]; then
+        CREATED_DIRS_CACHE="$(file_to_array "$created_dirs_offset")"
     fi
 
-    if [ -e "$CREATED_LINKS_CACHE_FILE" ]; then
-        CREATED_LINKS_CACHE="$(file_to_array "$CREATED_LINKS_CACHE_FILE")"
+    if [ -e "$created_links_offset" ]; then
+        CREATED_LINKS_CACHE="$(file_to_array "$created_links_offset")"
     fi
 
     if [ -e "$IGNORED_GLOBS_FILE" ]; then
@@ -391,7 +414,7 @@ install_config() {
         . "$meta_script"
     fi
 
-    info "installing dotfiles for '""$1""' to '""$install_dir""'"
+    info "installing '""$1""' configurations to '""$install_dir""'"
 
     # make sure config files exist
     conf_files_location="$1"'/conf'
@@ -426,6 +449,38 @@ install_config() {
     done
 }
 
+##
+# processes submodules by creating a child instance of ddm
+#
+# handles setting the DDM environment variable, then makes another ddm instance
+# in the given submodules folder.
+#
+# @1 - path of the submodules directory
+##
+process_submodules() {
+    # get path of current executing script for instantiating
+    # a new child instance
+    cur_script_path="$(realpath "$0")"
+
+    # set DDM if it doesn't exist
+    [ -z "$DDM" ] && DDM=0
+
+    # increment depth counter
+    DDM=$((DDM+1))
+
+    # export ddm for child
+    export DDM
+
+    # change directory into submodule
+    cd "$sub_folder" || { error 'could cd into submodule'; return 1; } 
+
+    # call child instance
+    $SH "$cur_script_path"
+
+    # exit directory of submodule
+    cd '../..'
+}
+
 ############################## SUBCOMMANDS ##############################  
 
 ##
@@ -448,10 +503,24 @@ install() {
             continue
         fi
 
-        if can_install "$appname"; then
-            install_config "$appname"
-        else
+        # if we can't install, just skip over
+        if ! can_install "$appname"; then
             warn "skipping '""$appname""'; not applicable"
+            continue
+        fi
+
+        install_config "$appname"
+
+        # store submodule folder
+        sub_folder="$folder"'sub'
+
+        if [ -d "$sub_folder" ]; then # make a recursive call
+            info "installing submodules for '""$appname""'"
+            process_submodules "$sub_folder"
+        else
+            # decrement DDM if it exists
+            [ -n "$DDM" ] && { DDM=$((DDM-1)); export DDM; }
+            [ "$DDM" = 0 ] && unset DDM
         fi
     done
 }
@@ -500,6 +569,14 @@ uninstall() {
 }
 
 ############################## CLI PROCESSING ##############################  
+
+# if we're making a recursive call we
+# must be installing, so skip parsing
+if [ -n "$DDM" ]; then
+    VERBOSE=1 # TODO: Remove always on verbose
+    install
+    return 0
+fi
 
 # print usage info with no arguments 
 if [ $# -lt 1 ]; then usage && exit 1; fi
