@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.2.1'
+VERSION='0.2.2'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
@@ -533,7 +533,7 @@ install() {
 uninstall() {
     # if no cache files exist we should warn the user about it and exit
     if [ ! -f "$CREATED_LINKS_CACHE_FILE" ] && [ ! -f "$CREATED_DIRS_CACHE_FILE" ]; then
-        warn 'cache files do not exist; are you sure you installed?'
+        error 'cache files do not exist; are you sure you installed?'
         return 1
     fi
 
@@ -570,13 +570,11 @@ uninstall() {
 
 ############################## CLI PROCESSING ##############################  
 
-# if we're making a recursive call we
-# must be installing, so skip parsing
-if [ -n "$DDM" ]; then
-    VERBOSE=1 # TODO: Remove always on verbose
-    install
-    return 0
-fi
+# if parent set DDM_ARGS for children
+[ -z "$DDM_ARGS" ] && { DDM_ARGS="$*"; export DDM_ARGS; }
+
+# if child 'import' ddm definitions from parent
+[ -n "$DDM" ] && { set $DDM_ARGS; }
 
 # print usage info with no arguments 
 if [ $# -lt 1 ]; then usage && exit 1; fi
