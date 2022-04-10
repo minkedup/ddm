@@ -2,31 +2,30 @@
 
 ## Introduction
 
-This core unit that `ddm` works with is called a configuration pack, abbreviated
-as `conf-pack` for short. A configuration pack contains metadata for how to
-install configuration files, coupled with configuration files. Each
+The core unit that `ddm` works with is called a configuration pack, abbreviated
+`conf-pack`. In short, configuration pack contains metadata for how to install
+configuration files, coupled with configuration files themselves. Each
 configuration pack should target one application, but the standard is flexible
 enough to accommodate non-standard configurations.
 
-The following sections describe how a configuration pack's directory should be
-laid out, as well as how `ddm` will process this layout.
+Configuration packs reside within pack directories. The next section explains
+how configuration packs should be laid out within a pack directory, with the
+following section describing how configuration packs should be setup. 
 
 ## The Pack Directory 
 
-`ddm` works within a pack directory when processing installations. Each
+`ddm` works within a pack directory when processing configuration packs. Each
 application should have a configuration pack named after it in the pack
 directory by convention.
 
-When `ddm` is first run, it treats the current directory as a pack directory,
-iterating through every directory in the current directory and processing it as
-a configuration pack. Users may have folders that they wish to exclude from
-being processed as a configuration pack. `ddm` supports the ignoring folders
-with a `.ddmignore` file.
+When `ddm` is first run, it treats the directory it is run in as a pack
+directory, iterating through every directory and processing it as a
+configuration pack. 
 
 ### .ddmignore file
 
-To allow users to have directories that are not configuration packs in their
-pack directory, `ddm` supports ignoring files based on pattern matching. Users
+To allow users to have directories that are not processed by `ddm` in their pack
+directory, `ddm` supports ignoring files based on pattern matching. Users
 familiar with basic `.gitignore` file syntax should find `.ddmignore` files
 familiar.
 
