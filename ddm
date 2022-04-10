@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.2.4'
+VERSION='0.2.5'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
@@ -104,6 +104,17 @@ prompt_conflict() {
 ############################## UTILITY ##############################  
 
 #################### STRING ####################  
+
+##
+# converts a string to all lowercase characters
+#
+# @1      - the string to convert to lowercase
+# @return - the string in all lowercase
+##
+to_lowercase() {
+    res="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+    printf '%s' "$res"
+}
 
 ##
 # determines whether or not a given string starts with a substr 
@@ -580,6 +591,7 @@ uninstall() {
 [ -z "$DDM_ARGS" ] && { DDM_ARGS="$*"; export DDM_ARGS; }
 
 # if child 'import' ddm definitions from parent
+# shellcheck disable=SC2086
 [ -n "$DDM" ] && { set $DDM_ARGS; }
 
 # print usage info with no arguments 
