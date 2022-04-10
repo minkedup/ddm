@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.2.2'
+VERSION='0.2.3'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
@@ -479,6 +479,16 @@ process_submodules() {
 
     # exit directory of submodule
     cd '../..'
+
+    # decrement ddm after exiting
+    DDM=$((DDM-1))
+
+    # export just in case
+    if [ "$DDM" -le 0 ]; then
+        unset DDM
+    else
+        export DDM
+    fi
 }
 
 ############################## SUBCOMMANDS ##############################  
@@ -517,10 +527,6 @@ install() {
         if [ -d "$sub_folder" ]; then # make a recursive call
             info "installing submodules for '""$appname""'"
             process_submodules "$sub_folder"
-        else
-            # decrement DDM if it exists
-            [ -n "$DDM" ] && { DDM=$((DDM-1)); export DDM; }
-            [ "$DDM" = 0 ] && unset DDM
         fi
     done
 }
