@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.2.3'
+VERSION='0.2.4'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
@@ -10,11 +10,11 @@ DOTFILES_GLOB='.[!.]*'
 
 IGNORED_GLOBS_FILE='.ddmignore'
 CREATED_DIRS_CACHE_FILE='.created_dirs'
-CREATED_LINKS_CACHE_FILE='.created_links'
+CREATED_FILES_CACHE_FILE='.created_files'
 
 IGNORED_GLOBS=''
 CREATED_DIRS_CACHE=''
-CREATED_LINKS_CACHE=''
+CREATED_FILES_CACHE=''
 
 RED='\e[31m'
 BOLD='\e[1m'
@@ -229,7 +229,7 @@ submodule_path_correct() {
 ##
 log_creation() {
     offset_dirs_file="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
-    offset_links_file="$(submodule_path_correct "$CREATED_LINKS_CACHE_FILE")"
+    offset_links_file="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
 
     if [ -d "$1" ]; then
         echo "$1" >> "$offset_dirs_file" 
@@ -252,7 +252,7 @@ log_creation() {
 ##
 resolve_file_conflict() {
     if [ -e "$1" ]; then
-        if in_array "$CREATED_LINKS_CACHE" "$1"; then
+        if in_array "$CREATED_FILES_CACHE" "$1"; then
             info "skipping '""$(basename "$1")""'; already installed"
             return 1
         fi
@@ -327,14 +327,14 @@ create_dir_if_not_exists() {
 ##
 load_persistent_files() {
     created_dirs_offset="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
-    created_links_offset="$(submodule_path_correct "$CREATED_LINKS_CACHE_FILE")"
+    created_links_offset="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
 
     if [ -e "$created_dirs_offset" ]; then
         CREATED_DIRS_CACHE="$(file_to_array "$created_dirs_offset")"
     fi
 
     if [ -e "$created_links_offset" ]; then
-        CREATED_LINKS_CACHE="$(file_to_array "$created_links_offset")"
+        CREATED_FILES_CACHE="$(file_to_array "$created_links_offset")"
     fi
 
     if [ -e "$IGNORED_GLOBS_FILE" ]; then
@@ -538,15 +538,15 @@ install() {
 ##
 uninstall() {
     # if no cache files exist we should warn the user about it and exit
-    if [ ! -f "$CREATED_LINKS_CACHE_FILE" ] && [ ! -f "$CREATED_DIRS_CACHE_FILE" ]; then
+    if [ ! -f "$CREATED_FILES_CACHE_FILE" ] && [ ! -f "$CREATED_DIRS_CACHE_FILE" ]; then
         error 'cache files do not exist; are you sure you installed?'
         return 1
     fi
 
     # remove cached created symlinks
-    if [ -f "$CREATED_LINKS_CACHE_FILE" ]; then
+    if [ -f "$CREATED_FILES_CACHE_FILE" ]; then
         # shellcheck disable=SC2013
-        for created_symlink in $(cat "$CREATED_LINKS_CACHE_FILE"); do
+        for created_symlink in $(cat "$CREATED_FILES_CACHE_FILE"); do
             if [ -e "$created_symlink" ]; then
                 info 'removing symlink "'"$created_symlink"'"'
                 rm "$created_symlink"
@@ -571,7 +571,7 @@ uninstall() {
         done
     fi
 
-    rm -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_LINKS_CACHE_FILE"
+    rm -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_FILES_CACHE_FILE"
 }
 
 ############################## CLI PROCESSING ##############################  
