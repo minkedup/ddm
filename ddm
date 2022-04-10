@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.1.2'
+VERSION='0.2.2'
 
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
@@ -125,6 +125,24 @@ starts_with() {
     return 1
 }
 
+##
+# shorthand for repeating a string n number of times
+# 
+# @1      - the number of times to repeat the string
+# @2      - the string to repeat
+# @return - the string (@2) repeated @1 number of times
+#           (eq to python str * num)
+##
+repeat_str() {
+    res=''
+    i=0
+    while [ "$i" -lt "$1" ]; do
+        res="$res""$2"
+        i=$((i+1))
+    done
+    printf '%s' "$res"
+}
+
 #################### ARRAYS ####################  
 
 ##
@@ -188,6 +206,39 @@ collect_file_glob() {
 #################### FILE SYSTEM ####################  
 
 ##
+# correct a given path with an offset to the root level directory
+#
+# @1      - the path to correct
+# @return - the corrected path 
+##
+submodule_path_correct() {
+    if [ -z "$DDM" ]; then
+        printf '%s' "$1"
+    else
+        num_above=$((DDM*2))
+        above_relpath="$(repeat_str "$num_above" '../')"
+
+        printf '%s%s' "$above_relpath" "$1"
+    fi
+}
+
+##
+# abstraction over caching the creation of a file/directory 
+#
+# @1 - the newly created file/directory to log
+##
+log_creation() {
+    offset_dirs_file="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
+    offset_links_file="$(submodule_path_correct "$CREATED_LINKS_CACHE_FILE")"
+
+    if [ -d "$1" ]; then
+        echo "$1" >> "$offset_dirs_file" 
+    else
+        echo "$1" >> "$offset_links_file"
+    fi
+}
+
+##
 # preemptive conflict detection and resolution
 #
 # the function first checks whether or not a file exists at a given
@@ -236,7 +287,7 @@ logged_ln() {
     info "linking '""$1""' to '""$2"
 
     if $LN "$1" "$2"; then
-        echo "$full_dest" >> "$CREATED_LINKS_CACHE_FILE"
+        log_creation "$full_dest"
         return 0
     else
         error 'cannot create symlink in '"$2" 
@@ -259,7 +310,7 @@ create_dir_if_not_exists() {
         info "creating directory '""$1""' to store config files" 
 
         if mkdir -p "$1"; then
-            echo "$1" >> "$CREATED_DIRS_CACHE_FILE" 
+            log_creation "$1"
             return 0
         else
             error "could not create install directory '""$1""'"
@@ -275,12 +326,15 @@ create_dir_if_not_exists() {
 # load persistent files into memory for easier processing
 ##
 load_persistent_files() {
-    if [ -e "$CREATED_DIRS_CACHE_FILE" ]; then
-        CREATED_DIRS_CACHE="$(file_to_array "$CREATED_DIRS_CACHE_FILE")"
+    created_dirs_offset="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
+    created_links_offset="$(submodule_path_correct "$CREATED_LINKS_CACHE_FILE")"
+
+    if [ -e "$created_dirs_offset" ]; then
+        CREATED_DIRS_CACHE="$(file_to_array "$created_dirs_offset")"
     fi
 
-    if [ -e "$CREATED_LINKS_CACHE_FILE" ]; then
-        CREATED_LINKS_CACHE="$(file_to_array "$CREATED_LINKS_CACHE_FILE")"
+    if [ -e "$created_links_offset" ]; then
+        CREATED_LINKS_CACHE="$(file_to_array "$created_links_offset")"
     fi
 
     if [ -e "$IGNORED_GLOBS_FILE" ]; then
@@ -360,7 +414,7 @@ install_config() {
         . "$meta_script"
     fi
 
-    info "installing dotfiles for '""$1""' to '""$install_dir""'"
+    info "installing '""$1""' configurations to '""$install_dir""'"
 
     # make sure config files exist
     conf_files_location="$1"'/conf'
@@ -395,6 +449,38 @@ install_config() {
     done
 }
 
+##
+# processes submodules by creating a child instance of ddm
+#
+# handles setting the DDM environment variable, then makes another ddm instance
+# in the given submodules folder.
+#
+# @1 - path of the submodules directory
+##
+process_submodules() {
+    # get path of current executing script for instantiating
+    # a new child instance
+    cur_script_path="$(realpath "$0")"
+
+    # set DDM if it doesn't exist
+    [ -z "$DDM" ] && DDM=0
+
+    # increment depth counter
+    DDM=$((DDM+1))
+
+    # export ddm for child
+    export DDM
+
+    # change directory into submodule
+    cd "$sub_folder" || { error 'could cd into submodule'; return 1; } 
+
+    # call child instance
+    $SH "$cur_script_path"
+
+    # exit directory of submodule
+    cd '../..'
+}
+
 ############################## SUBCOMMANDS ##############################  
 
 ##
@@ -417,10 +503,24 @@ install() {
             continue
         fi
 
-        if can_install "$appname"; then
-            install_config "$appname"
-        else
+        # if we can't install, just skip over
+        if ! can_install "$appname"; then
             warn "skipping '""$appname""'; not applicable"
+            continue
+        fi
+
+        install_config "$appname"
+
+        # store submodule folder
+        sub_folder="$folder"'sub'
+
+        if [ -d "$sub_folder" ]; then # make a recursive call
+            info "installing submodules for '""$appname""'"
+            process_submodules "$sub_folder"
+        else
+            # decrement DDM if it exists
+            [ -n "$DDM" ] && { DDM=$((DDM-1)); export DDM; }
+            [ "$DDM" = 0 ] && unset DDM
         fi
     done
 }
@@ -433,7 +533,7 @@ install() {
 uninstall() {
     # if no cache files exist we should warn the user about it and exit
     if [ ! -f "$CREATED_LINKS_CACHE_FILE" ] && [ ! -f "$CREATED_DIRS_CACHE_FILE" ]; then
-        warn 'cache files do not exist; are you sure you installed?'
+        error 'cache files do not exist; are you sure you installed?'
         return 1
     fi
 
@@ -453,8 +553,15 @@ uninstall() {
     if [ -f "$CREATED_DIRS_CACHE_FILE" ]; then
         # shellcheck disable=SC2013
         for created_folder in $(cat "$CREATED_DIRS_CACHE_FILE"); do
-            info 'removing directory "'"$created_folder"'" if empty'
+            # attempt to remove
             $RMDIR "$created_folder"
+
+            # check if remove worked and inform user
+            if [ -d "$created_folder" ]; then
+                warn 'could not remove directory "'"$created_folder"'"; not empty'
+            else
+                info 'removed directory "'"$created_folder"'"'
+            fi
         done
     fi
 
@@ -462,6 +569,12 @@ uninstall() {
 }
 
 ############################## CLI PROCESSING ##############################  
+
+# if parent set DDM_ARGS for children
+[ -z "$DDM_ARGS" ] && { DDM_ARGS="$*"; export DDM_ARGS; }
+
+# if child 'import' ddm definitions from parent
+[ -n "$DDM" ] && { set $DDM_ARGS; }
 
 # print usage info with no arguments 
 if [ $# -lt 1 ]; then usage && exit 1; fi
