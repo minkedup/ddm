@@ -96,13 +96,13 @@ install behavior.
 
 The `meta` file can be treated like a normal `sh` script, and should have access
 to any environment variable that an `sh` script would normally have access to.
-In addition to the normal environment variables, the `meta` file will also be
-passed custom variables from `ddm`. A reference listing of what the value of
-these variables mean can also be found at the end of this section.
+In addition to normal environment variables, the `meta` file will also be passed
+custom variables from `ddm`. A reference listing of what the value of these
+variables mean can also be found at the end of this section.
 
 **NOTE - the** `meta` **script must be executable!**
 
-#### Installation Properties
+#### Properties
 ```
 install_dir
     description: the directory to install the conf files to
@@ -110,9 +110,22 @@ install_dir
     value: string
 ```
 
-#### Installation Variables
+#### Variables
 
 **⛔Coming Soon ⛔**
+
+### Submodules
+
+Each configuration pack may include a directory named `sub`; If this directory
+is present, after the parent configuration pack has finished its installation,
+`ddm` will treat the `sub` directory as its own pack directory. 
+
+There is currently no depth limit to submodules; However, submodules are not
+processed with any special considerations: a 'parent' being installed does not
+guarantee that a child configuration pack is installed. Each submodule will
+still need to create its own definition of when it should be installed with an
+`inst.sh` file. For more information about installation checking, check out the
+[installation checking section](#install-checking).
 
 ### Example Configuration Pack
 
