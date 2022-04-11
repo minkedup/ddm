@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 
-VERSION='0.2.5'
+VERSION='0.2.6'
 
+CP='/usr/bin/env cp -Ln'
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
 RMDIR='rmdir --parents --ignore-fail-on-non-empty'
@@ -301,9 +302,31 @@ logged_ln() {
         log_creation "$full_dest"
         return 0
     else
-        error 'cannot create symlink in '"$2" 
+        error "cannot create symlink in '""$2""'" 
         return 1
     fi 
+}
+
+##
+# copy a file to a destination and log a success
+#
+# @1      - the source path
+# @2      - the destination path
+# @return - 0 for a copy success, 1 otherwise
+##
+logged_cp() {
+    filename="$(basename "$1")"
+    full_dest="$2"'/'"$filename"
+
+    info "copying '""$1""' to '""$2"
+
+    if $CP "$1" "$2"; then
+        log_creation "$full_dest"
+        return 0
+    else
+        error "cannot copy '""$filename""'to '""$2""'"
+        return 1
+    fi
 }
 
 ##
@@ -491,15 +514,14 @@ process_submodules() {
     # exit directory of submodule
     cd '../..'
 
-    # decrement ddm after exiting
+    # decrement ddm 
     DDM=$((DDM-1))
 
+    # unset if le 0 to prevent negative DDM
+    [ "$DDM" -le 0 ] && unset DDM
+    
     # export just in case
-    if [ "$DDM" -le 0 ]; then
-        unset DDM
-    else
-        export DDM
-    fi
+    export DDM
 }
 
 ############################## SUBCOMMANDS ##############################  
