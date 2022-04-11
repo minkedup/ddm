@@ -628,6 +628,9 @@ uninstall() {
 
 ############################## CLI PROCESSING ##############################  
 
+# if testing return instead of exit
+[ -n "$DDM_TEST" ] && return 0;
+
 # if parent set DDM_ARGS for children
 [ -z "$DDM_ARGS" ] && { DDM_ARGS="$*"; export DDM_ARGS; }
 
