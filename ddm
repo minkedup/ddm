@@ -1,11 +1,13 @@
 #!/usr/bin/env sh
 
-VERSION='0.2.6'
+VERSION='0.3.0'
 
 CP='/usr/bin/env cp -Ln'
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
 RMDIR='rmdir --parents --ignore-fail-on-non-empty'
+
+VALID_INSTALL_METHODS='symlink copy'
 
 DOTFILES_GLOB='.[!.]*'
 
@@ -442,10 +444,24 @@ install_config() {
 
     # setup default install variables
     install_dir="$HOME""/.config/""$1"
+    install_method="symlink"
 
     if [ -x "$meta_script" ]; then
         # shellcheck disable=SC1090
         . "$meta_script"
+    fi
+
+    # check installation properties for validity
+
+    # check install directory 
+    if ! create_dir_if_not_exists "$install_dir"; then
+        return 1;
+    fi
+
+    # check install method
+    if ! in_array "$VALID_INSTALL_METHODS" "$install_method"; then
+        error "unrecognized install_method: '""$install_method""'"
+        return 1
     fi
 
     info "installing '""$1""' configurations to '""$install_dir""'"
@@ -457,18 +473,21 @@ install_config() {
         return 1
     fi
 
-    # create/check existence of install directory
-    if ! create_dir_if_not_exists "$install_dir"; then
-        return 1;
-    fi
-
-    # init var for valid configuration files
+    # var for list of conf files
     conf_files=''
 
     # normally globs don't match dotfiles - so we need two passes, once to 
     # pick up the dotfiles, another to pick up any other files
     conf_files="$(collect_file_glob "$conf_files_location" "$DOTFILES_GLOB")"
     conf_files="$conf_files""$(collect_file_glob "$conf_files_location" '*')"
+
+    # store install function for repeated use
+    install_fn=''
+    if [ "$install_method" = "symlink" ]; then
+        install_fn=logged_ln
+    elif [ "$install_method" = "copy" ]; then
+        install_fn=logged_cp
+    fi
 
     # iterate through files linking to the right location
     for to_copy in $conf_files; do
@@ -479,7 +498,7 @@ install_config() {
             continue
         fi
 
-        logged_ln "$to_copy" "$install_dir"
+        $install_fn "$to_copy" "$install_dir"
     done
 }
 
@@ -579,10 +598,10 @@ uninstall() {
     # remove cached created symlinks
     if [ -f "$CREATED_FILES_CACHE_FILE" ]; then
         # shellcheck disable=SC2013
-        for created_symlink in $(cat "$CREATED_FILES_CACHE_FILE"); do
-            if [ -e "$created_symlink" ]; then
-                info 'removing symlink "'"$created_symlink"'"'
-                rm "$created_symlink"
+        for created_file in $(cat "$CREATED_FILES_CACHE_FILE"); do
+            if [ -e "$created_file" ]; then
+                info 'removing file "'"$created_file"'"'
+                rm "$created_file"
             fi
         done
     fi
