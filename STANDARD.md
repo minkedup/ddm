@@ -67,7 +67,7 @@ Please note that `.ddmignore` files don't support spaces.
 Each configuration pack must include a sub directory named `conf` that contains
 the configuration files for the application that the configuration package is
 targeting. More information about how `ddm` installs these configuration files
-can be found under the [installation properties](#installation-properties)
+can be found under the [install properties](#install-properties)
 section.
 
 ### Install Checking 
@@ -107,7 +107,10 @@ variables mean can also be found at the end of this section.
 install_dir
     description: the directory to install the conf files to
     default: $HOME/.config/<application_name>
-    value: string
+install_method
+    desription: selects the method of installation
+    default: symlink
+    variants: symlink || copy
 ```
 
 #### Variables
