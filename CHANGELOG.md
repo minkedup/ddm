@@ -2,6 +2,15 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.3.0 - 2022-04-12
+#### Bug Fixes
+- added ignore flags on variables - (1cbfe62) - Mickey Polito
+#### Documentation
+- added testing instructions to README - (a17aac1) - Mickey Polito
+#### Features
+- added test for shellcheck passing - (196d5b0) - Mickey Polito
+- - -
+
 ## 0.1.0 - 2022-04-11
 #### Bug Fixes
 - renamed CREATED_LINKS_* to CREATED_FILES_* - (75c90f9) - Mickey Polito
