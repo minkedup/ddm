@@ -3,6 +3,9 @@ setup() {
     load 'test_helper/bats-assert/load'
     load 'test_helper/bats-file/load'
 
+    # store overwritten path
+    DDM_BASE_DIR="$(pwd)"
+
     # create mock file directories
     DDM_TEST_SRC="$(mktemp -d)"
     DDM_TEST_DEST="$(mktemp -d)"
@@ -63,6 +66,11 @@ create_fake_application() {
 teardown() {
     # remove temporary directories
     rm -rf "$DDM_TEST_SRC" "$DDM_TEST_DEST"
+}
+
+@test 'passes_shellcheck' {
+    run shellcheck "$DDM_BASE_DIR"'/ddm'
+    assert_success
 }
 
 @test 'to_lowercase' {
