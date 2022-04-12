@@ -16,34 +16,18 @@ The only dependency `ddm` requires is a POSIX compliant shell.
 
 ### Installing
 
-To install `ddm` you can create a submodule in your current dotfile repository
-and symlink the `ddm` executable into place.
+The simplest was to install `ddm` is to copy the shell script into your dotfiles
+directory.
 
 ```sh
-cd existing/dotfile/repo 
-git submodule add https://github.com/displeased/ddm .ddm
-ln -sr .ddm/ddm ddm
-git add .gitmodules ddm .ddm/
-git commit -m "added ddm to my repo :)"
+# clone the repository
+$ git clone https://github.com/displeased/ddm
+
+# copy the binary file to your dotfiles directory
+$ cp ddm/ddm existing/dotfile/repo 
 ```
 
-This series of commands:
-- Creates a new submodule for `ddm` under `.ddm/`
-- Links the executable for `ddm` to the git repositories tld
-- Commits the changes to git
-
-Alternatively, if you don't want to use gitmodules feel free to simply copy the
-`ddm` binary from this git repo and commit it to your dotfile repo.
-
-```sh
-git clone https://github.com/displeased/ddm
-cp ddm/ddm existing/dotfile/repo 
-cd existing/dotfile/repo
-git add ddm
-git commit -m "Added ddm to my repo :)"
-```
-
-### Executing Program
+### Using
 
 `ddm` has two subcommands: install and uninstall.
 
@@ -56,30 +40,41 @@ ddm uninstall
 ```
 
 For more information about how `ddm` handles installs, please refer to
-[STANDARD.md](STANDARD.md); or, check out `ddm`'s help message with:
+[STANDARD.md](STANDARD.md).
+
+## Developing
+
+While `ddm` only relies on a POSIX shell during runtime, development and testing
+require more dependencies.
+
+- `bash`
+- [bats](https://github.com/bats-core/bats-core)
+
+Tests can be run by executing bats in the root level ddm repository: 
 
 ```sh
-ddm --help
+# run test suite 
+$ bats test
 ```
 
-## Authors
-
-@displeased
-
-## License
-
-This project is licensed under the GPL-3.0 License - see LICENSE for details
+For more information about how `bats` works, checkout out the [bats
+documentation](https://bats-core.readthedocs.io/).
 
 ## Contributions
 
 When contributing to this repository, please first discuss the change you wish
-to make via issue. 
+to make via a GitHub issue.
 
 ### Pull Request Process
 
-1. Ensure that running `shellcheck` on the program results in no errors and an
-   insignificant amount of warnings.
-2. Update the README.md with any changed to the interfaces with `inst.sh` and
-   `meta` files
-3. Once your pull request has been reviewed by the owner of this repository, it
+1. Running the unit tests results in all tests being passed
+2. Update the STANDARD with any changes to the standard
+3. Create a pull request with your change and link it with the issue that you're
+   working on
+4. Once your pull request has been reviewed by the owner of this repository, it
    will be merged.
+
+## License
+
+This project is licensed under the GPL-3.0 License - see [LICENSE](./LICENSE) for
+more details.
