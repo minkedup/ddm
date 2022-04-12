@@ -20,9 +20,11 @@ CREATED_DIRS_CACHE=''
 CREATED_FILES_CACHE=''
 
 RED='\e[31m'
+# shellcheck disable=SC2034
 BOLD='\e[1m'
 GRAY='\e[90m'
 WHITE='\e[0m'
+# shellcheck disable=SC2034
 GREEN='\e[32m'
 YELLO='\e[33m'
 
@@ -366,6 +368,7 @@ load_persistent_files() {
     created_links_offset="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
 
     if [ -e "$created_dirs_offset" ]; then
+        # shellcheck disable=SC2034
         CREATED_DIRS_CACHE="$(file_to_array "$created_dirs_offset")"
     fi
 
