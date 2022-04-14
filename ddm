@@ -558,13 +558,13 @@ install() {
 
     for folder in $(collect_file_glob '.' '*/'); do
         appname="$(basename "$folder")"
+        rel_folder="$appname"'/'
 
-        if is_ignored "$folder"; then
+        if is_ignored "$rel_folder"; then
             info "skipping '""$appname""'; excluded in ddmignore"
             continue
         fi
 
-        # if we can't install, just skip over
         if ! can_install "$appname"; then
             warn "skipping '""$appname""'; not applicable"
             continue
@@ -572,8 +572,8 @@ install() {
 
         install_config "$appname"
 
-        # store submodule folder
-        sub_folder="$folder"'sub'
+        # submodule folder
+        sub_folder="$rel_folder"'sub'
 
         if [ -d "$sub_folder" ]; then # make a recursive call
             info "installing submodules for '""$appname""'"

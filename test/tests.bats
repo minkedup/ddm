@@ -135,13 +135,12 @@ teardown() {
 @test 'collect_file_glob' {
     # we use the test env created in setup 
     # to match for foo
-    glob_dir='.'
     glob='foo*'
 
     # paths are absolute
-    expected_output=' ./foo ./foobar'
+    expected_output=' foo foobar'
 
-    run collect_file_glob "$glob_dir" "$glob"
+    run collect_file_glob "$glob"
     assert_output "$expected_output"
 }
 
