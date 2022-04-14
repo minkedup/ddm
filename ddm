@@ -389,11 +389,9 @@ load_persistent_files() {
 # takes a given application name and returns whether or not it is a valid
 # installation candidate 
 #
-# the function looks for an executable inst.sh file in the application directory
-# relative to the current directory; if it finds the file, the function runs it
-# with the global $SH, and returns its return value. otherwise, the function
-# checks whether or not the application name is in the $PATH, and returns false
-# if it cannot be found.
+# this function first checks that an application meets its installation
+# go-ahead, then it makes sure the configuration pack's in line with the spec,
+# meaning that the things that must exist are present
 #
 # @1      - the name of the application to verify
 # @return - 0 if the application meets the criterion for install,
@@ -401,17 +399,27 @@ load_persistent_files() {
 ##
 can_install() {
     verify_script="$1"'/inst.sh'
+    go_ahead=1
 
+    # check the go_ahead
     if [ -x "$verify_script" ]; then
         if $SH "$verify_script"; then
-            return 0
+            go_ahead=0
         fi
     else
         if [ -n "$(command -v "$appname")" ]; then
-            return 0
+            go_ahead=0
         fi
     fi
-    return 1
+
+    # don't check spec; exit without go-ahead
+    [ ! "$go_ahead" ] && return 1
+
+    # check that conf file dir exists
+    confs_location="$1"'/conf'
+    [ ! -d "$confs_location" ] && return 1
+
+    return 0
 }
 
 ##
@@ -473,20 +481,13 @@ install_config() {
 
     info "installing '""$1""' configurations to '""$install_dir""'"
 
-    # make sure config files exist
-    conf_files_location="$1"'/conf'
-    if [ ! -d "$conf_files_location" ]; then
-        warn 'could not find config files for application '"$1"
-        return 1
-    fi
-
-    # var for list of conf files
     conf_files=''
+    confs_location="$1"'/conf'
 
     # normally globs don't match dotfiles - so we need two passes, once to 
     # pick up the dotfiles, another to pick up any other files
-    conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$conf_files_location")"
-    conf_files="$conf_files""$(collect_file_glob '*' "$conf_files_location")"
+    conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
+    conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
 
     # store install function for repeated use
     install_fn=''
@@ -621,7 +622,7 @@ uninstall() {
             if [ -d "$created_folder" ]; then
                 warn 'could not remove directory "'"$created_folder"'"; not empty'
             else
-                info 'removed directory "'"$created_folder"'"'
+                info "removed directory '""$created_folder""'"
             fi
         done
     fi
