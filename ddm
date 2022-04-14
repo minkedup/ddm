@@ -556,12 +556,8 @@ process_submodules() {
 install() {
     load_persistent_files
 
-    for folder in */; do
-        if [ "$folder" = '*' ]; then
-            return 1
-        fi
-
-        appname="${folder%/}"
+    for folder in $(collect_file_glob '.' '*/'); do
+        appname="$(basename "$folder")"
 
         if is_ignored "$folder"; then
             info "skipping '""$appname""'; excluded in ddmignore"
