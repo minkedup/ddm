@@ -49,6 +49,7 @@ DESCRIPTION
 COMMANDS:
     install      Install application configurations
     uninstall    Remove installed application configurations
+    adopt        Pull configuration data back to the source(s)
 
 OPTIONS:
     -f    Do not prompt for file conflicts 
@@ -569,10 +570,8 @@ install() {
 
     for folder in $(collect_file_glob '*/'); do
         appname="$(basename "$folder")"
-        rel_folder="$appname"'/'
 
-        # check if in .ddmignore
-        if is_ignored "$rel_folder"; then
+        if is_ignored "$folder"; then
             info "skipping '""$appname""'; excluded in ddmignore"
             continue
         fi
@@ -633,6 +632,29 @@ uninstall() {
     rm -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_FILES_CACHE_FILE"
 }
 
+##
+# goes through the list of created files that are not symlinks and copied their
+# modified content back to the source directory for later version control
+# integration
+##
+adopt() {
+    load_persistent_files
+
+    for folder in $(collect_file_glob '*/'); do
+        appname="$(basename "$folder")"
+
+        is_ignored "$folder" && continue
+
+        ! can_install "$appname" && continue
+
+        # call submodules
+        sub_folder="$folder"'sub'
+        if [ -d "$sub_folder" ]; then
+            process_submodules "$sub_folder"
+        fi
+    done
+}
+
 ############################## CLI PROCESSING ##############################  
 
 # if testing return instead of exit
@@ -678,6 +700,8 @@ if [ "$subcommand" = "install" ]; then
     install
 elif [ "$subcommand" = "uninstall" ]; then
     uninstall
+elif [ "$subcommand" = "adopt" ]; then
+    adopt
 else
     error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."
     exit 1
