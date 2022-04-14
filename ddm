@@ -200,19 +200,23 @@ in_array() {
 # takes a file glob and a directory and returns the files that match the glob
 # in the directory in the form of a space separated string.
 # 
-# @1      - the directory in which to search
-# @2      - the glob to use in the directory
+# @1      - the glob to use in the directory
+# @2      - the directory in which to search - can be omitted
+#           to match in the current directory
 # @return - sh 'array' of the files that match the glob
 ##
 collect_file_glob() {
     collected_files=''
-    path_glob="$1"'/'"$2"
+    full_glob="$1"
 
-    for file in $path_glob; do
+    # append directory to glob if it exists
+    [ -n "$2" ] && full_glob="$2"'/'"$full_glob"
+
+    for file in $full_glob; do
         collected_files="$collected_files"' '"$file"
     done
 
-    if [ ! "${file# }" = "$path_glob" ]; then
+    if [ ! "${file# }" = "$full_glob" ]; then
         printf '%s' "$collected_files"
     else
         printf ''
@@ -481,8 +485,8 @@ install_config() {
 
     # normally globs don't match dotfiles - so we need two passes, once to 
     # pick up the dotfiles, another to pick up any other files
-    conf_files="$(collect_file_glob "$conf_files_location" "$DOTFILES_GLOB")"
-    conf_files="$conf_files""$(collect_file_glob "$conf_files_location" '*')"
+    conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$conf_files_location")"
+    conf_files="$conf_files""$(collect_file_glob '*' "$conf_files_location")"
 
     # store install function for repeated use
     install_fn=''
@@ -556,7 +560,7 @@ process_submodules() {
 install() {
     load_persistent_files
 
-    for folder in $(collect_file_glob '.' '*/'); do
+    for folder in $(collect_file_glob '*/'); do
         appname="$(basename "$folder")"
         rel_folder="$appname"'/'
 
@@ -566,7 +570,7 @@ install() {
         fi
 
         if ! can_install "$appname"; then
-            warn "skipping '""$appname""'; not applicable"
+            warn "skipping '""$appname""'; not valid configuration pack"
             continue
         fi
 
