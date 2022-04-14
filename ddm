@@ -516,9 +516,15 @@ install_config() {
 # handles setting the DDM environment variable, then makes another ddm instance
 # in the given submodules folder.
 #
-# @1 - path of the submodules directory
+# @1      - the application for which to install the submodules
+# @return - 1 if for failure for any reason (including non-existent
+#           submodule dir), 0 for success
 ##
 process_submodules() {
+    # check existence of directory 
+    submodules_dir="$1"'/sub'
+    ! [ -d "$submodules_dir" ] && return 1 
+
     # get path of current executing script for instantiating
     # a new child instance
     cur_script_path="$(realpath "$0")"
@@ -533,7 +539,7 @@ process_submodules() {
     export DDM
 
     # change directory into submodule
-    cd "$sub_folder" || { error 'could cd into submodule'; return 1; } 
+    cd "$submodules_dir" || { error 'could cd into submodule'; DDM=$((DDM-1)); export DDM; return 1; } 
 
     # call child instance
     $SH "$cur_script_path"
@@ -565,25 +571,22 @@ install() {
         appname="$(basename "$folder")"
         rel_folder="$appname"'/'
 
+        # check if in .ddmignore
         if is_ignored "$rel_folder"; then
             info "skipping '""$appname""'; excluded in ddmignore"
             continue
         fi
 
+        # check if we can install application
         if ! can_install "$appname"; then
-            warn "skipping '""$appname""'; not valid configuration pack"
+            warn "skipping '""$appname""'; not able to install"
             continue
         fi
 
         install_config "$appname"
 
-        # submodule folder
-        sub_folder="$rel_folder"'sub'
-
-        if [ -d "$sub_folder" ]; then # make a recursive call
-            info "installing submodules for '""$appname""'"
-            process_submodules "$sub_folder"
-        fi
+        # process submodules
+        process_submodules "$appname"
     done
 }
 
