@@ -671,6 +671,9 @@ adopt() {
 
             # skip if configuration not copied
             ! [ -e "$destination" ] && continue
+
+            info "adopting file '""$destination""'"
+
             cp -L "$destination" "$conf"
         done
 
