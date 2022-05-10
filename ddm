@@ -647,6 +647,20 @@ adopt() {
 
         ! can_install "$appname" && continue
 
+        # load install dir variable
+        install_dir="$HOME"'/.config/'"$appname"'/'
+
+        meta_script="$folder"'meta'
+        if [ -x "$meta_script" ]; then
+            # shellcheck disable=SC1090
+            . "$meta_script"
+        fi
+
+        confs_location="$folder"'conf/'
+        # collect configuration files
+        conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
+        conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
+
         # call submodules
         sub_folder="$folder"'sub'
         if [ -d "$sub_folder" ]; then
