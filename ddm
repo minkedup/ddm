@@ -49,6 +49,7 @@ DESCRIPTION
 COMMANDS:
     install      Install application configurations
     uninstall    Remove installed application configurations
+    adopt        Pull configuration data back to the source(s)
 
 OPTIONS:
     -f    Do not prompt for file conflicts 
@@ -200,19 +201,23 @@ in_array() {
 # takes a file glob and a directory and returns the files that match the glob
 # in the directory in the form of a space separated string.
 # 
-# @1      - the directory in which to search
-# @2      - the glob to use in the directory
+# @1      - the glob to use in the directory
+# @2      - the directory in which to search - can be omitted
+#           to match in the current directory
 # @return - sh 'array' of the files that match the glob
 ##
 collect_file_glob() {
     collected_files=''
-    path_glob="$1"'/'"$2"
+    full_glob="$1"
 
-    for file in $path_glob; do
+    # append directory to glob if it exists
+    [ -n "$2" ] && full_glob="$2"'/'"$full_glob"
+
+    for file in $full_glob; do
         collected_files="$collected_files"' '"$file"
     done
 
-    if [ ! "${file# }" = "$path_glob" ]; then
+    if [ ! "${file# }" = "$full_glob" ]; then
         printf '%s' "$collected_files"
     else
         printf ''
@@ -385,11 +390,9 @@ load_persistent_files() {
 # takes a given application name and returns whether or not it is a valid
 # installation candidate 
 #
-# the function looks for an executable inst.sh file in the application directory
-# relative to the current directory; if it finds the file, the function runs it
-# with the global $SH, and returns its return value. otherwise, the function
-# checks whether or not the application name is in the $PATH, and returns false
-# if it cannot be found.
+# this function first checks that an application meets its installation
+# go-ahead, then it makes sure the configuration pack's in line with the spec,
+# meaning that the things that must exist are present
 #
 # @1      - the name of the application to verify
 # @return - 0 if the application meets the criterion for install,
@@ -397,17 +400,27 @@ load_persistent_files() {
 ##
 can_install() {
     verify_script="$1"'/inst.sh'
+    go_ahead=1
 
+    # check the go_ahead
     if [ -x "$verify_script" ]; then
         if $SH "$verify_script"; then
-            return 0
+            go_ahead=0
         fi
     else
         if [ -n "$(command -v "$appname")" ]; then
-            return 0
+            go_ahead=0
         fi
     fi
-    return 1
+
+    # don't check spec; exit without go-ahead
+    [ ! "$go_ahead" ] && return 1
+
+    # check that conf file dir exists
+    confs_location="$1"'/conf'
+    [ ! -d "$confs_location" ] && return 1
+
+    return 0
 }
 
 ##
@@ -469,20 +482,13 @@ install_config() {
 
     info "installing '""$1""' configurations to '""$install_dir""'"
 
-    # make sure config files exist
-    conf_files_location="$1"'/conf'
-    if [ ! -d "$conf_files_location" ]; then
-        warn 'could not find config files for application '"$1"
-        return 1
-    fi
-
-    # var for list of conf files
     conf_files=''
+    confs_location="$1"'/conf'
 
     # normally globs don't match dotfiles - so we need two passes, once to 
     # pick up the dotfiles, another to pick up any other files
-    conf_files="$(collect_file_glob "$conf_files_location" "$DOTFILES_GLOB")"
-    conf_files="$conf_files""$(collect_file_glob "$conf_files_location" '*')"
+    conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
+    conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
 
     # store install function for repeated use
     install_fn=''
@@ -511,9 +517,15 @@ install_config() {
 # handles setting the DDM environment variable, then makes another ddm instance
 # in the given submodules folder.
 #
-# @1 - path of the submodules directory
+# @1      - the application for which to install the submodules
+# @return - 1 if for failure for any reason (including non-existent
+#           submodule dir), 0 for success
 ##
 process_submodules() {
+    # check existence of directory 
+    submodules_dir="$1"'/sub'
+    ! [ -d "$submodules_dir" ] && return 1 
+
     # get path of current executing script for instantiating
     # a new child instance
     cur_script_path="$(realpath "$0")"
@@ -528,7 +540,7 @@ process_submodules() {
     export DDM
 
     # change directory into submodule
-    cd "$sub_folder" || { error 'could cd into submodule'; return 1; } 
+    cd "$submodules_dir" || { error 'could cd into submodule'; DDM=$((DDM-1)); export DDM; return 1; } 
 
     # call child instance
     $SH "$cur_script_path"
@@ -556,33 +568,24 @@ process_submodules() {
 install() {
     load_persistent_files
 
-    for folder in */; do
-        if [ "$folder" = '*' ]; then
-            return 1
-        fi
-
-        appname="${folder%/}"
+    for folder in $(collect_file_glob '*/'); do
+        appname="$(basename "$folder")"
 
         if is_ignored "$folder"; then
             info "skipping '""$appname""'; excluded in ddmignore"
             continue
         fi
 
-        # if we can't install, just skip over
+        # check if we can install application
         if ! can_install "$appname"; then
-            warn "skipping '""$appname""'; not applicable"
+            warn "skipping '""$appname""'; not able to install"
             continue
         fi
 
         install_config "$appname"
 
-        # store submodule folder
-        sub_folder="$folder"'sub'
-
-        if [ -d "$sub_folder" ]; then # make a recursive call
-            info "installing submodules for '""$appname""'"
-            process_submodules "$sub_folder"
-        fi
+        # process submodules
+        process_submodules "$appname"
     done
 }
 
@@ -621,12 +624,65 @@ uninstall() {
             if [ -d "$created_folder" ]; then
                 warn 'could not remove directory "'"$created_folder"'"; not empty'
             else
-                info 'removed directory "'"$created_folder"'"'
+                info "removed directory '""$created_folder""'"
             fi
         done
     fi
 
     rm -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_FILES_CACHE_FILE"
+}
+
+##
+# goes through the list of created files that are not symlinks and copied their
+# modified content back to the source directory for later version control
+# integration
+##
+adopt() {
+    load_persistent_files
+
+    for folder in $(collect_file_glob '*/'); do
+        appname="$(basename "$folder")"
+
+        is_ignored "$folder" && continue
+
+        ! can_install "$appname" && continue
+
+        # load install dir variable
+        install_dir="$HOME"'/.config/'"$appname"'/'
+        install_method="symlink"
+
+        meta_script="$folder"'meta'
+        if [ -x "$meta_script" ]; then
+            # shellcheck disable=SC1090
+            . "$meta_script"
+        fi
+
+        # skip re-adopting symlinks
+        [ "$install_method" = 'symlink' ] && continue
+
+        confs_location="$folder"'conf/'
+        # collect configuration files
+        conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
+        conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
+
+        for conf in $conf_files; do
+            conf_filename="$(basename "$conf")"
+            destination="$install_dir""$conf_filename"
+
+            # skip if configuration not copied
+            ! [ -e "$destination" ] && continue
+
+            info "adopting file '""$destination""'"
+
+            cp -L "$destination" "$conf"
+        done
+
+        # call submodules
+        sub_folder="$folder"'sub'
+        if [ -d "$sub_folder" ]; then
+            process_submodules "$sub_folder"
+        fi
+    done
 }
 
 ############################## CLI PROCESSING ##############################  
@@ -674,6 +730,8 @@ if [ "$subcommand" = "install" ]; then
     install
 elif [ "$subcommand" = "uninstall" ]; then
     uninstall
+elif [ "$subcommand" = "adopt" ]; then
+    adopt
 else
     error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."
     exit 1
