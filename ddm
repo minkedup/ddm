@@ -649,6 +649,7 @@ adopt() {
 
         # load install dir variable
         install_dir="$HOME"'/.config/'"$appname"'/'
+        install_method="symlink"
 
         meta_script="$folder"'meta'
         if [ -x "$meta_script" ]; then
@@ -656,10 +657,22 @@ adopt() {
             . "$meta_script"
         fi
 
+        # skip re-adopting symlinks
+        [ "$install_method" = 'symlink' ] && continue
+
         confs_location="$folder"'conf/'
         # collect configuration files
         conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
         conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
+
+        for conf in $conf_files; do
+            conf_filename="$(basename "$conf")"
+            destination="$install_dir""$conf_filename"
+
+            # skip if configuration not copied
+            ! [ -e "$destination" ] && continue
+            cp -L "$destination" "$conf"
+        done
 
         # call submodules
         sub_folder="$folder"'sub'
