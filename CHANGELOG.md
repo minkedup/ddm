@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.4.1 - 2022-05-10
+
+- - -
+
+## 0.3.2 - 2022-04-14
+#### Bug Fixes
+- fixed bug introduced by globbing change - (beb31aa) - Mickey Polito
+- streamlined application globbing with util func - (950cd8b) - Mickey Polito
+#### Refactoring
+- moved conf file checking into validity check - (413380b) - Mickey Polito
+
+- - -
+
 ## 0.3.0 - 2022-04-12
 #### Bug Fixes
 - added ignore flags on variables - (1cbfe62) - Mickey Polito
