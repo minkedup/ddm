@@ -1,10 +1,11 @@
 #!/usr/bin/env sh
 
-VERSION='0.3.0'
+VERSION='0.4.1'
 
 CP='/usr/bin/env cp -Ln'
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
+GREP='/usr/bin/env grep'
 RMDIR='rmdir --parents --ignore-fail-on-non-empty'
 
 VALID_INSTALL_METHODS='symlink copy'
@@ -34,7 +35,7 @@ FORCE=0
 ############################## OUTPUT ##############################  
 
 ##
-# print usage information to the user
+# responsible for printing the usage of the command to the user
 ##
 usage() {
 cat << EOF
@@ -59,7 +60,10 @@ EOF
 }
 
 ##
-# prints info to the user if the global flag $VERBOSE is set
+# prints verbose output to the user
+#
+# prints info to the user if the global flag $VERBOSE is greater than
+# 0 ($VERBOSE should be set to 1 for verbose output).
 #
 # @1 - the message to display to the user 
 ##
@@ -79,7 +83,7 @@ warn() {
 }
 
 ##
-# displays an error to the user in red
+# displays an unrecoverable error to the user
 #
 # @1 - the error message to display
 ##
@@ -90,12 +94,11 @@ error() {
 ##
 # prompts the user to resolve a file conflict
 #
-# the function prompts the user to overwrite a file, allowing the user to
-# respond with Y\N with Y as a default. the function returns true if the user
-# would like to overwrite the file, and false otherwise.
+# this function prompts the user to overwrite a given file, allowing
+# the user to respond with Y\N (with Y as a default).
 #
 # @1      - the name of the file to prompt the user to overwrite 
-# @return - true for overwrite, false for keeping the original
+# @return - true for overwrite (yes), false otherwise
 ##
 prompt_conflict() {
     warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
@@ -118,8 +121,7 @@ prompt_conflict() {
 # @return - the string in all lowercase
 ##
 to_lowercase() {
-    res="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
-    printf '%s' "$res"
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
 ##
@@ -130,34 +132,30 @@ to_lowercase() {
 # @return - true if the string starts with the substr, false otherwise
 ##
 starts_with() {
-    # match at the start of a line
-    find_regex='^'"$1"
-
-    res="$(echo "$2" | grep -Eo "$find_regex")"
-
-    # empty response is no match
-    if [ -n "$res" ]; then
-        return 0
-    fi
+    regex='^'"$1"
+    masked="$(printf '%s' "$2" | $GREP -E "$regex")" 
+    
+    # if we match grep returns something
+    [ -n "$masked" ] && return 0
     return 1
 }
 
 ##
-# shorthand for repeating a string n number of times
+# repeat a string n number of times 
 # 
 # @1      - the number of times to repeat the string
 # @2      - the string to repeat
 # @return - the string (@2) repeated @1 number of times
-#           (eq to python str * num)
 ##
 repeat_str() {
-    res=''
+    result=''
     i=0
     while [ "$i" -lt "$1" ]; do
-        res="$res""$2"
+        result="$result""$2"
         i=$((i+1))
     done
-    printf '%s' "$res"
+
+    printf '%s' "$result"
 }
 
 #################### ARRAYS ####################  
