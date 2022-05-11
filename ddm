@@ -163,35 +163,30 @@ repeat_str() {
 ##
 # reads the given file into a space-separated string 'array'
 #
-# the function reads the given file into a string, replacing every encountered
-# newline with a space. note: any spaces in the file will be interpreted as a
-# new element in the 'array' 
+# the function reads the given file into a string with each new line
+# being interpreted as a space. 
 #
-# @1      - the file to read into an 'array'
-# @return - the string 'array'
+# @1      - the file to read
+# @return - the string array
 ##
 file_to_array() {
-    filtered_content="$(tr '\n' ' ' < "$1")"
-
-    printf '%s' "$filtered_content"
+    replaced="$(tr '\n' ' ' < "$1")"
+    printf '%s' "$replaced"
 }
 
 ##
-# checks whether or not a string is in an 'array'
+# checks whether or not a string is in a string array
 #
-# the function iterates through an 'array' of space separated elements and
-# returns whether or not the given string is equal to any element in the 'array'
-#
-# @1      - the 'array' in which to search
-# @2      - the string to search for in the 'array'
-# @return - 0 if the string is in the 'array', 1 otherwise
+# @1      - the item to search for in the array
+# @2      - the string array to search
+# @return - 0 if the string is in the array, 1 otherwise
 ##
 in_array() {
-    for element in $1; do
-        if [ "$2" = "$element" ]; then
-            return 0
-        fi
-    done
+    regex=' '"$1"'( |$)'
+    masked="$(printf '%s' "$2" | $GREP -E "$regex")"
+
+    # if we match return 0
+    [ -n "$masked" ] && return 0
     return 1
 }
 
@@ -202,7 +197,7 @@ in_array() {
 # @1      - the glob to use in the directory
 # @2      - the directory in which to search - can be omitted
 #           to match in the current directory
-# @return - sh 'array' of the files that match the glob
+# @return - string array of the files that match the glob
 ##
 collect_file_glob() {
     collected_files=''
@@ -271,7 +266,7 @@ log_creation() {
 ##
 resolve_file_conflict() {
     if [ -e "$1" ]; then
-        if in_array "$CREATED_FILES_CACHE" "$1"; then
+        if in_array "$1" "$CREATED_FILES_CACHE"; then
             info "skipping '""$(basename "$1")""'; already installed"
             return 1
         fi
@@ -473,7 +468,7 @@ install_config() {
     fi
 
     # check install method
-    if ! in_array "$VALID_INSTALL_METHODS" "$install_method"; then
+    if ! in_array "$install_method" "$VALID_INSTALL_METHODS"; then
         error "unrecognized install_method: '""$install_method""'"
         return 1
     fi
