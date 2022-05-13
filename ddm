@@ -250,31 +250,33 @@ log_node() {
 ##
 # preemptive conflict detection and resolution
 #
-# the function first checks whether or not a file exists at a given
-# destination. if the file does exist, it then checks the global $FORCE flag
-# and returns true if it's set. otherwise, it prompts the user to overwrite it,
-# returning true if the user would like to overwrite it, otherwise returning
-# false. 
+# the function first checks whether or not a given file exists. if the file
+# does exist, it then checks the global $FORCE flag and returns true if it's
+# set; otherwise, it prompts the user to overwrite it, returning the user's
+# decision 
 #
 # @1      - the destination file to check
 # @return - 0 for a successful resolution, 1 if a conflict could 
 ##
 resolve_file_conflict() {
-    if [ -e "$1" ]; then
-        if in_array "$1" "$CREATED_FILES_CACHE"; then
-            info "skipping '""$(basename "$1")""'; already installed"
-            return 1
-        fi
+    # if the file doesn't exist we don't have a problem
+    ! [ -e "$1" ] && return 0
 
-        if [ "$FORCE" -gt 0 ]; then
-            warn "force enabled overriding '""$1""' with symlink"
-            return 0
-        else
-            if ! prompt_conflict "$1"; then
-                info "skipping '""$(basename "$1")""'"
-                return 1
-            fi
-        fi
+    # if it's in the files we've created we can skip
+    if in_array "$1" "$CREATED_FILES_CACHE"; then
+        info "skipping '""$(basename "$1")""'; already installed"
+        return 1
+    fi
+
+    # if force is enabled we can override
+    if [ "$FORCE" -gt 0 ]; then
+        warn "force enabled overriding '""$1""' with symlink"
+        return 0
+    fi
+
+    if ! prompt_conflict "$1"; then
+        info "skipping '""$(basename "$1")""'"
+        return 1
     fi
 }
 
