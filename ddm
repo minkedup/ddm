@@ -219,17 +219,16 @@ collect_glob() {
 # correct a given path with an offset to the root level directory
 #
 # @1      - the path to correct
-# @return - the corrected path 
+# @return - the corrected path (can be the same as the input path) 
 ##
 submodule_path_correct() {
-    if [ -z "$DDM" ]; then
-        printf '%s' "$1"
-    else
-        num_above=$((DDM*2))
-        above_relpath="$(repeat_str "$num_above" '../')"
+    # if the nest variable is not set we aren't recursing 
+    [ -z "$DDM" ] && { printf '%s' "$1"; return; }
 
-        printf '%s%s' "$above_relpath" "$1"
-    fi
+    # create the relative path correction
+    correction="$(repeat_str $((DDM * 2)) '../')"
+
+    printf '%s%s' "$correction" "$1"
 }
 
 ##
@@ -237,15 +236,15 @@ submodule_path_correct() {
 #
 # @1 - the newly created file/directory to log
 ##
-log_creation() {
-    offset_dirs_file="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
-    offset_links_file="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
+log_node() {
+    corrected_dirs_cache="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
+    corrected_files_cache="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
 
-    if [ -d "$1" ]; then
-        echo "$1" >> "$offset_dirs_file" 
-    else
-        echo "$1" >> "$offset_links_file"
-    fi
+    # log into the dirs cache file if we created a directory
+    [ -d "$1" ] && { echo "$1" >> "$corrected_dirs_cache"; return 0; }
+
+    # log into the files cache file if we created a file (copying) or a link
+    [ -f "$1" ] || [ -L "$1" ] && { echo "$1" >> "$corrected_files_cache"; return 0; }
 }
 
 ##
@@ -297,7 +296,7 @@ logged_ln() {
     info "linking '""$1""' to '""$2"
 
     if $LN "$1" "$2"; then
-        log_creation "$full_dest"
+        log_node "$full_dest"
         return 0
     else
         error "cannot create symlink in '""$2""'" 
@@ -319,7 +318,7 @@ logged_cp() {
     info "copying '""$1""' to '""$2"
 
     if $CP "$1" "$2"; then
-        log_creation "$full_dest"
+        log_node "$full_dest"
         return 0
     else
         error "cannot copy '""$filename""'to '""$2""'"
@@ -342,7 +341,7 @@ create_dir_if_not_exists() {
         info "creating directory '""$1""' to store config files" 
 
         if mkdir -p "$1"; then
-            log_creation "$1"
+            log_node "$1"
             return 0
         else
             error "could not create install directory '""$1""'"
