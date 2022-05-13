@@ -5,6 +5,7 @@ VERSION='0.4.1'
 CP='/usr/bin/env cp -Ln'
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
+LS='/usr/bin/env ls -dC'
 GREP='/usr/bin/env grep'
 RMDIR='rmdir --parents --ignore-fail-on-non-empty'
 
@@ -195,26 +196,21 @@ in_array() {
 # in the directory in the form of a space separated string.
 # 
 # @1      - the glob to use in the directory
-# @2      - the directory in which to search - can be omitted
-#           to match in the current directory
-# @return - string array of the files that match the glob
+# @2      - the directory in which to search (can be omitted
+#           to match in the current directory)
+# @return - string array of the files that match the glob, or
+#           nothing if the glob doesn't match
 ##
 collect_file_glob() {
-    collected_files=''
-    full_glob="$1"
+    matches=''
+    glob="$1"
 
-    # append directory to glob if it exists
-    [ -n "$2" ] && full_glob="$2"'/'"$full_glob"
+    # append directory arg to glob
+    [ -n "$2" ] && glob="$2"'/'"$glob"
 
-    for file in $full_glob; do
-        collected_files="$collected_files"' '"$file"
-    done
+    matches="$($LS $glob 2>/dev/null)"
 
-    if [ ! "${file# }" = "$full_glob" ]; then
-        printf '%s' "$collected_files"
-    else
-        printf ''
-    fi
+    printf '%s' "$matches"
 }
 
 #################### FILE SYSTEM ####################  
