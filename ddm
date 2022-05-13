@@ -232,9 +232,11 @@ submodule_path_correct() {
 }
 
 ##
-# abstraction over caching the creation of a file/directory 
+# add a newly created directory or file to the appropriate cache
+# for later retrieval
 #
-# @1 - the newly created file/directory to log
+# @1      - the newly created file/directory to log
+# @return - whether or not the node was successfully logged
 ##
 log_node() {
     corrected_dirs_cache="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
@@ -245,6 +247,9 @@ log_node() {
 
     # log into the files cache file if we created a file (copying) or a link
     [ -f "$1" ] || [ -L "$1" ] && { echo "$1" >> "$corrected_files_cache"; return 0; }
+
+    # file is neither a directory, file, or symlink - something's wrong
+    return 1
 }
 
 ##
@@ -292,18 +297,19 @@ resolve_file_conflict() {
 # @return - 0 for link success, 1 for failure
 ##
 logged_ln() {
-    filename="$(basename "$1")"
-    full_dest="$2"'/'"$filename"
+    dest_filename="$(basename "$1")"
+    dest_fpath="$2"'/'"$dest_filename"
 
-    info "linking '""$1""' to '""$2"
+    info "linking '""$1""' into '""$2""'"
 
-    if $LN "$1" "$2"; then
-        log_node "$full_dest"
-        return 0
-    else
-        error "cannot create symlink in '""$2""'" 
-        return 1
-    fi 
+    # log and suppress error msg
+    $LN "$1" "$2" 2>/dev/null
+
+    # if the symlink doesn't exist we weren't able to link
+    ! [ -h "$dest_fpath" ] && { error "failed to create symlink in '""$2""'"; return 1; }
+
+    log_node "$dest_fpath"
+    return 0
 }
 
 ##
