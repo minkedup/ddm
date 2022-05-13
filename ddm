@@ -183,7 +183,7 @@ file_to_array() {
 # @return - 0 if the string is in the array, 1 otherwise
 ##
 in_array() {
-    regex=' '"$1"'( |$)'
+    regex="$1"'( |$)'
     masked="$(printf '%s' "$2" | $GREP -E "$regex")"
 
     # if we match return 0
