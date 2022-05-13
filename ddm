@@ -201,7 +201,7 @@ in_array() {
 # @return - string array of the files that match the glob, or
 #           nothing if the glob doesn't match
 ##
-collect_file_glob() {
+collect_glob() {
     matches=''
     glob="$1"
 
@@ -476,8 +476,8 @@ install_config() {
 
     # normally globs don't match dotfiles - so we need two passes, once to 
     # pick up the dotfiles, another to pick up any other files
-    conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
-    conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
+    conf_files="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
+    conf_files="$conf_files""$(collect_glob '*' "$confs_location")"
 
     # store install function for repeated use
     install_fn=''
@@ -557,7 +557,7 @@ process_submodules() {
 install() {
     load_persistent_files
 
-    for folder in $(collect_file_glob '*/'); do
+    for folder in $(collect_glob '*/'); do
         appname="$(basename "$folder")"
 
         if is_ignored "$folder"; then
@@ -629,7 +629,7 @@ uninstall() {
 adopt() {
     load_persistent_files
 
-    for folder in $(collect_file_glob '*/'); do
+    for folder in $(collect_glob '*/'); do
         appname="$(basename "$folder")"
 
         is_ignored "$folder" && continue
@@ -651,8 +651,8 @@ adopt() {
 
         confs_location="$folder"'conf/'
         # collect configuration files
-        conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
-        conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
+        conf_files="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
+        conf_files="$conf_files""$(collect_glob '*' "$confs_location")"
 
         for conf in $conf_files; do
             conf_filename="$(basename "$conf")"
