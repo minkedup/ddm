@@ -192,8 +192,8 @@ in_array() {
 }
 
 ##
-# takes a file glob and a directory and returns the files that match the glob
-# in the directory in the form of a space separated string.
+# takes a glob pattern and an (optional) directory and returns the
+# files that match the glob in the directory.
 # 
 # @1      - the glob to use in the directory
 # @2      - the directory in which to search (can be omitted
