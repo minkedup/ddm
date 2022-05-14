@@ -387,23 +387,21 @@ can_install() {
     verify_script="$1"'/inst.sh'
     go_ahead=1
 
-    # check the go_ahead
     if [ -x "$verify_script" ]; then
-        if $SH "$verify_script"; then
-            go_ahead=0
-        fi
+        $SH "$verify_script" && { go_ahead=0; }
     else
-        if [ -n "$(command -v "$appname")" ]; then
-            go_ahead=0
-        fi
+        # if the verification script doesn't exist use the default
+        # method of checking if the command can be run
+        [ -n "$(command -v "$appname")" ] && { go_ahead=0; }
     fi
 
-    # don't check spec; exit without go-ahead
-    [ ! "$go_ahead" ] && return 1
+    # perform no further checking without go-ahead;
+    # we know that we cannot install
+    [ ! "$go_ahead" ] && { return 1; }
 
-    # check that conf file dir exists
-    confs_location="$1"'/conf'
-    [ ! -d "$confs_location" ] && return 1
+    # make sure conf directory exists
+    conf_path="$1"'/conf'
+    ! [ -d "$conf_path" ] && { return 1; }
 
     return 0
 }
