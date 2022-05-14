@@ -24,12 +24,8 @@ CREATED_DIRS_CACHE=''
 CREATED_FILES_CACHE=''
 
 RED='\e[31m'
-# shellcheck disable=SC2034
-BOLD='\e[1m'
 GRAY='\e[90m'
 WHITE='\e[0m'
-# shellcheck disable=SC2034
-GREEN='\e[32m'
 YELLO='\e[33m'
 
 VERBOSE=0
@@ -357,6 +353,7 @@ populate_caches() {
     files_cache_path="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
 
     # load caches with file_to_array function
+    # shellcheck disable=SC2034
     CREATED_DIRS_CACHE="$(file_to_array "$dirs_cache_path")"
     CREATED_FILES_CACHE="$(file_to_array "$files_cache_path")"
     IGNORED_GLOBS="$(file_to_array "$IGNORED_GLOBS_FILE")"
@@ -489,7 +486,7 @@ install_config() {
         info "$fname_pretty"" '""$conf""' to '""$install_dir""'" 
 
         # pre-emptively resolve file conflicts
-        ! resolve_file_conflict "$destination" && continue
+        ! resolve_file_conflict "$dest_path" && continue
 
         # install with fully qualified paths
         $install_fn "$src_path" "$dest_path"
