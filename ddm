@@ -6,6 +6,7 @@ CP='/usr/bin/env cp -Ln'
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -sf'
 LS='/usr/bin/env ls -dC'
+RM='/usr/bin/env rm'
 GREP='/usr/bin/env grep'
 MKDIR='/usr/bin/env mkdir -p'
 RMDIR='rmdir --parents --ignore-fail-on-non-empty'
@@ -545,9 +546,10 @@ process_submodules() {
 ############################## SUBCOMMANDS ##############################  
 
 ##
-# installs all application packages in the given directory by first checking if
-# they can be installed, then running the install_config command on them; this
-# is the main driver behind all application configuration installation
+# installs all application packages in the given directory by
+# first checking if they can be installed, then running the
+# install_config command on them; this is the main driver behind
+# all application configuration installation
 ##
 install() {
     populate_caches
@@ -555,6 +557,7 @@ install() {
     for folder in $(collect_glob '*/'); do
         appname="$(basename "$folder")"
 
+        # skip the folder if it is in the .ddmignore
         if is_ignored "$folder"; then
             info "skipping '""$appname""'; excluded in ddmignore"
             continue
@@ -566,54 +569,51 @@ install() {
             continue
         fi
 
+        # install associated configuration files
         install_config "$appname"
 
-        # process submodules
+        # process submodule (if it exists)
         process_submodules "$appname"
     done
 }
 
 ##
-# uses the corresponding cache files to remove the installed symlinks and
-# folders, first removing the symlinks, then removing the empty folders that
-# remain (and leaving the ones that aren't empty)
+# uses the corresponding cache files to remove the installed
+# symlinks and folders, first removing the symlinks, then
+# removing the empty folders that remain (and leaving the ones
+# that aren't empty)
 ##
 uninstall() {
     # if no cache files exist we should warn the user about it and exit
     if [ ! -f "$CREATED_FILES_CACHE_FILE" ] && [ ! -f "$CREATED_DIRS_CACHE_FILE" ]; then
-        error 'cache files do not exist; are you sure you installed?'
+        warn 'cache files do not exist; are you sure you installed?'
         return 1
     fi
 
-    # remove cached created symlinks
-    if [ -f "$CREATED_FILES_CACHE_FILE" ]; then
-        # shellcheck disable=SC2013
-        for created_file in $(cat "$CREATED_FILES_CACHE_FILE"); do
-            if [ -e "$created_file" ]; then
-                info 'removing file "'"$created_file"'"'
-                rm "$created_file"
-            fi
-        done
-    fi
+    # attempt to remove created files/symlinks
+    created_files="$(file_to_array "$CREATED_FILES_CACHE_FILE")"
+    for file in $created_files; do
+        # remove the file redirecting errors
+        [ -e "$file" ] && { info "removing file '""$file""'"; $RM "$file" 2>/dev/null; }
 
+        # make sure that the file has been deleted
+        [ -e "$file" ] && { error "could not remove file '""$file""'"; continue; }
+    done
 
-    # remove empty created folders
-    if [ -f "$CREATED_DIRS_CACHE_FILE" ]; then
-        # shellcheck disable=SC2013
-        for created_folder in $(cat "$CREATED_DIRS_CACHE_FILE"); do
-            # attempt to remove
-            $RMDIR "$created_folder"
+    # attempt to remove created directories
+    created_dirs="$(file_to_array "$CREATED_DIRS_CACHE_FILE")"
+    for directory in $created_dirs; do
+        $RMDIR "$directory"
 
-            # check if remove worked and inform user
-            if [ -d "$created_folder" ]; then
-                warn 'could not remove directory "'"$created_folder"'"; not empty'
-            else
-                info "removed directory '""$created_folder""'"
-            fi
-        done
-    fi
+        # check if the directory still exists
+        [ -d "$directory" ] && { warn "could not remove directory '""$directory""'"; continue; }
 
-    rm -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_FILES_CACHE_FILE"
+        # notify the user that we deleted a directory
+        info "removed directory '""$directory""'"
+    done
+
+    # remove caches after use
+    $RM -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_FILES_CACHE_FILE"
 }
 
 ##
