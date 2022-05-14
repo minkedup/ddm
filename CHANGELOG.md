@@ -28,10 +28,6 @@ All notable changes to this project will be documented in this file. See [conven
 
 - - -
 
-## 0.4.1 - 2022-05-10
-
-- - -
-
 ## 0.3.2 - 2022-04-14
 #### Bug Fixes
 - fixed bug introduced by globbing change - (beb31aa) - Mickey Polito
