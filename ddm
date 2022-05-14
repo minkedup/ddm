@@ -498,8 +498,8 @@ install_config() {
 ##
 # processes submodules by creating a child instance of ddm
 #
-# handles setting the DDM environment variable, then makes another ddm instance
-# in the given submodules folder.
+# handles setting the DDM environment variable, then makes
+# another ddm instance in the given submodules folder.
 #
 # @1      - the application for which to install the submodules
 # @return - 1 if for failure for any reason (including non-existent
