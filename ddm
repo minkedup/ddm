@@ -643,21 +643,22 @@ adopt() {
         # skip re-adopting symlinks
         [ "$install_method" = 'symlink' ] && continue
 
-        confs_location="$appfolder"'conf/'
-        # collect configuration files
-        conf_files="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
-        conf_files="$conf_files""$(collect_glob '*' "$confs_location")"
+        # collect files in install directory 
+        dest_files="$(collect_glob "$DOTFILES_GLOB" "$install_dir")"
+        dest_files="$dest_files""$(collect_glob '*' "$install_dir")"
 
-        for conf in $conf_files; do
-            conf_filename="$(basename "$conf")"
-            destination="$install_dir""$conf_filename"
+        for dest_conf in $dest_files; do
+            dconf_fname="$(basename "$dest_conf")"
 
-            # skip if configuration not copied
-            ! [ -e "$destination" ] && continue
+            # work out potential corresponding source file for a
+            # given destination file
+            src_conf="$appfolder"'conf/'"$dconf_fname"
 
-            info "adopting file '""$destination""'"
+            # if the corresponding file doesn't exist, continue
+            ! [ -f "$src_conf" ] && { continue; }
 
-            cp -L "$destination" "$conf"
+            # copy the destination back to the source
+            cp -L "$dest_conf" "$src_conf"
         done
 
         # call submodules if they exist
