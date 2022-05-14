@@ -7,6 +7,7 @@ SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -srf'
 LS='/usr/bin/env ls -dC'
 GREP='/usr/bin/env grep'
+MKDIR='/usr/bin/env mkdir -p'
 RMDIR='rmdir --parents --ignore-fail-on-non-empty'
 
 VALID_INSTALL_METHODS='symlink copy'
@@ -333,27 +334,21 @@ logged_cp() {
 }
 
 ##
-# create a directory if it doesn't exist already
-#
-# the function creates a directory if it doesn't exist, logging the newly
-# created directory in ddm's cache files for later removals. the function
-# notifies the user that it has created a new directory.
+# create a directory if it doesn't already exist
 #
 # @1      - the path of the directory to create
 # @return - 0 on success, 1 for creation failure
 ##
 create_dir_if_not_exists() {
-    if [ ! -d "$1" ]; then
-        info "creating directory '""$1""' to store config files" 
+    # if the directory exists we do nothing
+    [ -d "$1" ] && return 0
 
-        if mkdir -p "$1"; then
-            log_node "$1"
-            return 0
-        else
-            error "could not create install directory '""$1""'"
-            return 1
-        fi
-    fi
+    info "creating directory '""$1""' for confs" 
+
+    # create directory and log error if it occurs
+    ! $MKDIR "$1" && { error "could not create directory '""$1""'"; return 1; }
+    
+    log_node "$1"
     return 0
 }
 
