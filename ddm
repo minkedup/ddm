@@ -208,6 +208,7 @@ collect_glob() {
     # append directory arg to glob
     [ -n "$2" ] && glob="$2"'/'"$glob"
 
+    # shellcheck disable=SC2086
     matches="$($LS $glob 2>/dev/null)"
 
     printf '%s' "$matches"
