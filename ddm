@@ -172,6 +172,9 @@ repeat_str() {
 # @return - the string array
 ##
 file_to_array() {
+    # if the file doesn't exist return empty array and error
+    ! [ -f "$1" ] && { printf '%s' ""; return 1; }
+
     replaced="$(tr '\n' ' ' < "$1")"
     printf '%s' "$replaced"
 }
@@ -355,24 +358,17 @@ create_dir_if_not_exists() {
 #################### FUNCTIONALITY ####################  
 
 ##
-# load persistent files into memory for easier processing
+# load persistent files into memory
 ##
-load_persistent_files() {
-    created_dirs_offset="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
-    created_links_offset="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
+populate_caches() {
+    # correct tld cache file paths for submodule recursion
+    dirs_cache_path="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
+    files_cache_path="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
 
-    if [ -e "$created_dirs_offset" ]; then
-        # shellcheck disable=SC2034
-        CREATED_DIRS_CACHE="$(file_to_array "$created_dirs_offset")"
-    fi
-
-    if [ -e "$created_links_offset" ]; then
-        CREATED_FILES_CACHE="$(file_to_array "$created_links_offset")"
-    fi
-
-    if [ -e "$IGNORED_GLOBS_FILE" ]; then
-        IGNORED_GLOBS="$(file_to_array "$IGNORED_GLOBS_FILE")"
-    fi
+    # load caches with file_to_array function
+    CREATED_DIRS_CACHE="$(file_to_array "$dirs_cache_path")"
+    CREATED_FILES_CACHE="$(file_to_array "$files_cache_path")"
+    IGNORED_GLOBS="$(file_to_array "$IGNORED_GLOBS_FILE")"
 }
 
 ##
@@ -383,7 +379,7 @@ load_persistent_files() {
 # go-ahead, then it makes sure the configuration pack's in line with the spec,
 # meaning that the things that must exist are present
 #
-# @1      - the name of the application to verify
+# @1      - the name of the application
 # @return - 0 if the application meets the criterion for install,
 #           1 otherwise
 ##
@@ -555,7 +551,7 @@ process_submodules() {
 # is the main driver behind all application configuration installation
 ##
 install() {
-    load_persistent_files
+    populate_caches
 
     for folder in $(collect_glob '*/'); do
         appname="$(basename "$folder")"
@@ -627,7 +623,7 @@ uninstall() {
 # integration
 ##
 adopt() {
-    load_persistent_files
+    populate_caches
 
     for folder in $(collect_glob '*/'); do
         appname="$(basename "$folder")"
