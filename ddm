@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VERSION='0.4.1'
+VERSION='0.4.2'
 
 CP='/usr/bin/env cp -Ln'
 SH='/usr/bin/env sh'
