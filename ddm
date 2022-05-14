@@ -4,7 +4,7 @@ VERSION='0.4.1'
 
 CP='/usr/bin/env cp -Ln'
 SH='/usr/bin/env sh'
-LN='/usr/bin/env ln -srf'
+LN='/usr/bin/env ln -sf'
 LS='/usr/bin/env ls -dC'
 GREP='/usr/bin/env grep'
 MKDIR='/usr/bin/env mkdir -p'
@@ -298,18 +298,13 @@ resolve_file_conflict() {
 # @return - 0 for link success, 1 for failure
 ##
 logged_ln() {
-    dest_filename="$(basename "$1")"
-    dest_fpath="$2"'/'"$dest_filename"
-
-    info "linking '""$1""' into '""$2""'"
-
     # log and suppress error msg
     $LN "$1" "$2" 2>/dev/null
 
     # if the symlink doesn't exist we weren't able to link
-    ! [ -h "$dest_fpath" ] && { error "failed to create symlink in '""$2""'"; return 1; }
+    ! [ -h "$2" ] && { error "failed to create symlink in '""$2""'"; return 1; }
 
-    log_node "$dest_fpath"
+    log_node "$2"
     return 0
 }
 
@@ -321,18 +316,13 @@ logged_ln() {
 # @return - 0 for a copy success, 1 for failure 
 ##
 logged_cp() {
-    dest_filename="$(basename "$1")"
-    dest_fpath="$2"'/'"$dest_filename"
-
-    info "copying '""$1""' to '""$2"
-
     # copy and suppress error msg
     $CP "$1" "$2" 2>/dev/null
 
     # if the file doesn't exist we weren't able to copy
-    ! [ -f "$dest_fpath" ] && { error "failed to copy file to '""$2""'"; return 1; }
+    ! [ -f "$2" ] && { error "failed to copy file to '""$2""'"; return 1; }
 
-    log_node "$dest_fpath"
+    log_node "$2"
     return 0
 }
 
@@ -429,9 +419,9 @@ is_ignored() {
 ##
 # installs an application with its installation properties
 #
-# the function sets up default installation properties, then allows the
-# application's meta file to override them; the function then installs the
-# application
+# the function sets up default installation properties, then
+# allows the application's meta file to override them; the
+# function then installs the application
 #
 # @1      - the name of the application to install
 # @return - 0 for a successful install, 1 for any error
@@ -443,53 +433,65 @@ install_config() {
     # setup default install variables
     install_dir="$HOME""/.config/""$1"
     install_method="symlink"
-
+    
+    # override defaults if meta script exists
     if [ -x "$meta_script" ]; then
         # shellcheck disable=SC1090
         . "$meta_script"
     fi
 
-    # check installation properties for validity
-
-    # check install directory 
-    if ! create_dir_if_not_exists "$install_dir"; then
-        return 1;
-    fi
+    # perform sanity checks on install variables
 
     # check install method
     if ! in_array "$install_method" "$VALID_INSTALL_METHODS"; then
-        error "unrecognized install_method: '""$install_method""'"
+        error "'""$install_method""' is not a valid install method for '""$1""'"
         return 1
     fi
 
-    info "installing '""$1""' configurations to '""$install_dir""'"
+    # check install directory 
+    ! create_dir_if_not_exists "$install_dir" && { return 1; } 
 
-    conf_files=''
+    # notify the user that an install is progressing
+    info "installing '""$1""' confs"
+
+    # setup configuration searching
     confs_location="$1"'/conf'
+    unset confs
 
-    # normally globs don't match dotfiles - so we need two passes, once to 
+    # normally globs don't match dotfiles so we need two passes, once to 
     # pick up the dotfiles, another to pick up any other files
-    conf_files="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
-    conf_files="$conf_files""$(collect_glob '*' "$confs_location")"
+    confs="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
+    confs="$confs""$(collect_glob '*' "$confs_location")"
 
-    # store install function for repeated use
-    install_fn=''
-    if [ "$install_method" = "symlink" ]; then
-        install_fn=logged_ln
-    elif [ "$install_method" = "copy" ]; then
-        install_fn=logged_cp
-    fi
+    # derive and cache install function 
+    case "$install_method" in
+        "symlink")
+            install_fn=logged_ln
+            fname_pretty='linking'
+            ;;
+        "copy")
+            install_fn=logged_cp
+            fname_pretty='copying'
+            ;;
+        *)
+            error "unreachable; unknown install method '""$install_method""'"
+            return 1
+            ;;
+    esac
 
-    # iterate through files linking to the right location
-    for to_copy in $conf_files; do
-        to_copy_name="$(basename "$to_copy")"
-        destination="$install_dir"'/'"$to_copy_name"
+    for conf in $confs; do
+        conf_fname="$(basename "$conf")"
+        dest_path="$install_dir"'/'"$conf_fname"
+        src_path="$(realpath "$conf")"
 
-        if ! resolve_file_conflict "$destination"; then
-            continue
-        fi
+        # pretty-print current file operation
+        info "$fname_pretty"" '""$conf""' to '""$install_dir""'" 
 
-        $install_fn "$to_copy" "$install_dir"
+        # pre-emptively resolve file conflicts
+        ! resolve_file_conflict "$destination" && continue
+
+        # install with fully qualified paths
+        $install_fn "$src_path" "$dest_path"
     done
 }
 
