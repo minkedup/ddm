@@ -287,14 +287,10 @@ resolve_file_conflict() {
 }
 
 ##
-# create a symlink with the globally defined $LN
+# create a symlink between the source file path and a given destination
 #
-# the function links a given source to a given destination, logging the
-# operation to the console for the user to read as well as logging the created
-# destination to ddm's cache files for later removals.
-#
-# @1      - source file's path 
-# @2      - the destination path 
+# @1      - source file path 
+# @2      - destination path 
 # @return - 0 for link success, 1 for failure
 ##
 logged_ln() {
@@ -316,23 +312,24 @@ logged_ln() {
 ##
 # copy a file to a destination and log a success
 #
-# @1      - the source path
-# @2      - the destination path
-# @return - 0 for a copy success, 1 otherwise
+# @1      - source file path
+# @2      - destination path
+# @return - 0 for a copy success, 1 for failure 
 ##
 logged_cp() {
-    filename="$(basename "$1")"
-    full_dest="$2"'/'"$filename"
+    dest_filename="$(basename "$1")"
+    dest_fpath="$2"'/'"$dest_filename"
 
     info "copying '""$1""' to '""$2"
 
-    if $CP "$1" "$2"; then
-        log_node "$full_dest"
-        return 0
-    else
-        error "cannot copy '""$filename""'to '""$2""'"
-        return 1
-    fi
+    # copy and suppress error msg
+    $CP "$1" "$2" 2>/dev/null
+
+    # if the file doesn't exist we weren't able to copy
+    ! [ -f "$dest_fpath" ] && { error "failed to copy file to '""$2""'"; return 1; }
+
+    log_node "$dest_fpath"
+    return 0
 }
 
 ##
