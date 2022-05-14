@@ -617,25 +617,24 @@ uninstall() {
 }
 
 ##
-# goes through the list of created files that are not symlinks and copied their
-# modified content back to the source directory for later version control
-# integration
+# goes through the list of created files that are not symlinks
+# and copied their modified content back to the source directory
+# for later version control integration
 ##
 adopt() {
     populate_caches
 
-    for folder in $(collect_glob '*/'); do
-        appname="$(basename "$folder")"
+    for appfolder in $(collect_glob '*/'); do
+        appname="$(basename "$appfolder")"
 
-        is_ignored "$folder" && continue
-
+        # skip if not an installation candidate
+        is_ignored "$appfolder" && continue
         ! can_install "$appname" && continue
 
         # load install dir variable
         install_dir="$HOME"'/.config/'"$appname"'/'
-        install_method="symlink"
 
-        meta_script="$folder"'meta'
+        meta_script="$appfolder"'meta'
         if [ -x "$meta_script" ]; then
             # shellcheck disable=SC1090
             . "$meta_script"
@@ -644,7 +643,7 @@ adopt() {
         # skip re-adopting symlinks
         [ "$install_method" = 'symlink' ] && continue
 
-        confs_location="$folder"'conf/'
+        confs_location="$appfolder"'conf/'
         # collect configuration files
         conf_files="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
         conf_files="$conf_files""$(collect_glob '*' "$confs_location")"
@@ -661,11 +660,8 @@ adopt() {
             cp -L "$destination" "$conf"
         done
 
-        # call submodules
-        sub_folder="$folder"'sub'
-        if [ -d "$sub_folder" ]; then
-            process_submodules "$sub_folder"
-        fi
+        # call submodules if they exist
+        [ -d "$appfolder"'sub' ] && { process_submodules "$appname"; }
     done
 }
 
