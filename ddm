@@ -2,7 +2,7 @@
 
 VERSION='0.4.2'
 
-CP='/usr/bin/env cp -Ln'
+CP='/usr/bin/env cp -L'
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -sf'
 LS='/usr/bin/env ls -dC'
@@ -31,7 +31,7 @@ YELLO='\e[33m'
 VERBOSE=0
 FORCE=0
 
-############################## OUTPUT ##############################  
+############################## OUTPUT ##############################
 
 ##
 # responsible for printing the usage of the command to the user
@@ -52,7 +52,7 @@ COMMANDS:
     adopt        Pull configuration data back to the source(s)
 
 OPTIONS:
-    -f    Do not prompt for file conflicts 
+    -f    Do not prompt for file conflicts
     -v    Increase verbosity to debug levels
     -h    Show this help
 EOF
@@ -64,16 +64,16 @@ EOF
 # prints info to the user if the global flag $VERBOSE is greater than
 # 0 ($VERBOSE should be set to 1 for verbose output).
 #
-# @1 - the message to display to the user 
+# @1 - the message to display to the user
 ##
 info() {
     if [ "$VERBOSE" -gt 0 ]; then
-        printf '%b[ info ]%b %s\n' "$GRAY" "$WHITE" "$1" 
+        printf '%b[ info ]%b %s\n' "$GRAY" "$WHITE" "$1"
     fi
 }
 
 ##
-# warns the user that something may be wrong 
+# warns the user that something may be wrong
 #
 # @1 - the message to warn the user
 ##
@@ -96,7 +96,7 @@ error() {
 # this function prompts the user to overwrite a given file, allowing
 # the user to respond with Y\N (with Y as a default).
 #
-# @1      - the name of the file to prompt the user to overwrite 
+# @1      - the name of the file to prompt the user to overwrite
 # @return - true for overwrite (yes), false otherwise
 ##
 prompt_conflict() {
@@ -109,9 +109,9 @@ prompt_conflict() {
     esac
 }
 
-############################## UTILITY ##############################  
+############################## UTILITY ##############################
 
-#################### STRING ####################  
+#################### STRING ####################
 
 ##
 # converts a string to all lowercase characters
@@ -124,7 +124,7 @@ to_lowercase() {
 }
 
 ##
-# determines whether or not a given string starts with a substr 
+# determines whether or not a given string starts with a substr
 #
 # @1      - the subtr to look for at the begining
 # @2      - the string in which to search
@@ -132,16 +132,16 @@ to_lowercase() {
 ##
 starts_with() {
     regex='^'"$1"
-    masked="$(printf '%s' "$2" | $GREP -E "$regex")" 
-    
+    masked="$(printf '%s' "$2" | $GREP -E "$regex")"
+
     # if we match grep returns something
     [ -n "$masked" ] && return 0
     return 1
 }
 
 ##
-# repeat a string n number of times 
-# 
+# repeat a string n number of times
+#
 # @1      - the number of times to repeat the string
 # @2      - the string to repeat
 # @return - the string (@2) repeated @1 number of times
@@ -157,13 +157,13 @@ repeat_str() {
     printf '%s' "$result"
 }
 
-#################### ARRAYS ####################  
+#################### ARRAYS ####################
 
 ##
 # reads the given file into a space-separated string 'array'
 #
 # the function reads the given file into a string with each new line
-# being interpreted as a space. 
+# being interpreted as a space.
 #
 # @1      - the file to read
 # @return - the string array
@@ -195,7 +195,7 @@ in_array() {
 ##
 # takes a glob pattern and an (optional) directory and returns the
 # files that match the glob in the directory.
-# 
+#
 # @1      - the glob to use in the directory
 # @2      - the directory in which to search (can be omitted
 #           to match in the current directory)
@@ -215,16 +215,16 @@ collect_glob() {
     printf '%s' "$matches"
 }
 
-#################### FILE SYSTEM ####################  
+#################### FILE SYSTEM ####################
 
 ##
 # correct a given path with an offset to the root level directory
 #
 # @1      - the path to correct
-# @return - the corrected path (can be the same as the input path) 
+# @return - the corrected path (can be the same as the input path)
 ##
 submodule_path_correct() {
-    # if the nest variable is not set we aren't recursing 
+    # if the nest variable is not set we aren't recursing
     [ -z "$DDM" ] && { printf '%s' "$1"; return; }
 
     # create the relative path correction
@@ -260,10 +260,10 @@ log_node() {
 # the function first checks whether or not a given file exists. if the file
 # does exist, it then checks the global $FORCE flag and returns true if it's
 # set; otherwise, it prompts the user to overwrite it, returning the user's
-# decision 
+# decision
 #
 # @1      - the destination file to check
-# @return - 0 for a successful resolution, 1 if a conflict could 
+# @return - 0 for a successful resolution, 1 if a conflict could
 ##
 resolve_file_conflict() {
     # if the file doesn't exist we don't have a problem
@@ -290,8 +290,8 @@ resolve_file_conflict() {
 ##
 # create a symlink between the source file path and a given destination
 #
-# @1      - source file path 
-# @2      - destination path 
+# @1      - source file path
+# @2      - destination path
 # @return - 0 for link success, 1 for failure
 ##
 logged_ln() {
@@ -310,7 +310,7 @@ logged_ln() {
 #
 # @1      - source file path
 # @2      - destination path
-# @return - 0 for a copy success, 1 for failure 
+# @return - 0 for a copy success, 1 for failure
 ##
 logged_cp() {
     # copy and suppress error msg
@@ -333,16 +333,16 @@ create_dir_if_not_exists() {
     # if the directory exists we do nothing
     [ -d "$1" ] && return 0
 
-    info "creating directory '""$1""' for confs" 
+    info "creating directory '""$1""' for confs"
 
     # create directory and log error if it occurs
     ! $MKDIR "$1" && { error "could not create directory '""$1""'"; return 1; }
-    
+
     log_node "$1"
     return 0
 }
 
-#################### FUNCTIONALITY ####################  
+#################### FUNCTIONALITY ####################
 
 ##
 # load persistent files into memory
@@ -361,7 +361,7 @@ populate_caches() {
 
 ##
 # takes a given application name and returns whether or not it is a valid
-# installation candidate 
+# installation candidate
 #
 # this function first checks that an application meets its installation
 # go-ahead, then it makes sure the configuration pack's in line with the spec,
@@ -399,7 +399,7 @@ can_install() {
 # in the ignore cache.
 #
 # @1      - the directory/file name to check against
-# @return - 0 if the directory is in the ignore cache, 1 otherwise 
+# @return - 0 if the directory is in the ignore cache, 1 otherwise
 ##
 is_ignored() {
     # if the cache is empty, no pattern matches in it
@@ -408,7 +408,7 @@ is_ignored() {
     for ignore in $IGNORED_GLOBS; do
         # if any of our patterns matches the path we exit;
         # this relies on starts_with's internal implementation
-        # detail of a regex search to complete searches 
+        # detail of a regex search to complete searches
         starts_with "$ignore" "$1" && { return 0; }
     done
     return 1
@@ -431,7 +431,7 @@ install_config() {
     # setup default install variables
     install_dir="$HOME""/.config/""$1"
     install_method="symlink"
-    
+
     # override defaults if meta script exists
     if [ -x "$meta_script" ]; then
         # shellcheck disable=SC1090
@@ -446,8 +446,8 @@ install_config() {
         return 1
     fi
 
-    # check install directory 
-    ! create_dir_if_not_exists "$install_dir" && { return 1; } 
+    # check install directory
+    ! create_dir_if_not_exists "$install_dir" && { return 1; }
 
     # notify the user that an install is progressing
     info "installing '""$1""' confs"
@@ -456,12 +456,12 @@ install_config() {
     confs_location="$1"'/conf'
     unset confs
 
-    # normally globs don't match dotfiles so we need two passes, once to 
+    # normally globs don't match dotfiles so we need two passes, once to
     # pick up the dotfiles, another to pick up any other files
     confs="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
     confs="$confs""$(collect_glob '*' "$confs_location")"
 
-    # derive and cache install function 
+    # derive and cache install function
     case "$install_method" in
         "symlink")
             install_fn=logged_ln
@@ -483,10 +483,17 @@ install_config() {
         src_path="$(realpath "$conf")"
 
         # pretty-print current file operation
-        info "$fname_pretty"" '""$conf""' to '""$install_dir""'" 
+        info "$fname_pretty"" '""$conf""' to '""$install_dir""'"
 
-        # pre-emptively resolve file conflicts
-        ! resolve_file_conflict "$dest_path" && continue
+        # check if the destination path exists and attempt resolve
+        if resolve_file_conflict "$dest_path"; then
+            # the user has indicated that they want to override, so delete
+            # the file that currently exists to make room for new file
+            $RM "$dest_path"
+        else
+            # if we couldn't resolve the conflict skip over the file
+            continue
+        fi
 
         # install with fully qualified paths
         $install_fn "$src_path" "$dest_path"
@@ -504,9 +511,9 @@ install_config() {
 #           submodule dir), 0 for success
 ##
 process_submodules() {
-    # check existence of directory 
+    # check existence of directory
     submodules_dir="$1"'/sub'
-    ! [ -d "$submodules_dir" ] && return 1 
+    ! [ -d "$submodules_dir" ] && return 1
 
     # get path of current executing script for instantiating
     # a new child instance
@@ -522,7 +529,7 @@ process_submodules() {
     export DDM
 
     # change directory into submodule
-    cd "$submodules_dir" || { error 'could cd into submodule'; DDM=$((DDM-1)); export DDM; return 1; } 
+    cd "$submodules_dir" || { error 'could cd into submodule'; DDM=$((DDM-1)); export DDM; return 1; }
 
     # call child instance
     $SH "$cur_script_path"
@@ -530,17 +537,17 @@ process_submodules() {
     # exit directory of submodule
     cd '../..'
 
-    # decrement ddm 
+    # decrement ddm
     DDM=$((DDM-1))
 
     # unset if le 0 to prevent negative DDM
     [ "$DDM" -le 0 ] && unset DDM
-    
+
     # export just in case
     export DDM
 }
 
-############################## SUBCOMMANDS ##############################  
+############################## SUBCOMMANDS ##############################
 
 ##
 # installs all application packages in the given directory by
@@ -640,7 +647,7 @@ adopt() {
         # skip re-adopting symlinks
         [ "$install_method" = 'symlink' ] && continue
 
-        # collect files in install directory 
+        # collect files in install directory
         dest_files="$(collect_glob "$DOTFILES_GLOB" "$install_dir")"
         dest_files="$dest_files""$(collect_glob '*' "$install_dir")"
 
@@ -663,7 +670,7 @@ adopt() {
     done
 }
 
-############################## CLI PROCESSING ##############################  
+############################## CLI PROCESSING ##############################
 
 # if testing return instead of exit
 [ -n "$DDM_TEST" ] && return 0;
@@ -675,10 +682,10 @@ adopt() {
 # shellcheck disable=SC2086
 [ -n "$DDM" ] && { set $DDM_ARGS; }
 
-# print usage info with no arguments 
+# print usage info with no arguments
 if [ $# -lt 1 ]; then usage && exit 1; fi
 
-# help shortcut - subcommand processing would ordinarily prevent help flags 
+# help shortcut - subcommand processing would ordinarily prevent help flags
 if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then usage && exit 0; fi
 
 # parse command line options
