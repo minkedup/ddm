@@ -1,10 +1,14 @@
 #!/usr/bin/env sh
 
-VERSION='0.3.0'
+VERSION='0.4.2'
 
 CP='/usr/bin/env cp -Ln'
 SH='/usr/bin/env sh'
-LN='/usr/bin/env ln -srf'
+LN='/usr/bin/env ln -sf'
+LS='/usr/bin/env ls -dC'
+RM='/usr/bin/env rm'
+GREP='/usr/bin/env grep'
+MKDIR='/usr/bin/env mkdir -p'
 RMDIR='rmdir --parents --ignore-fail-on-non-empty'
 
 VALID_INSTALL_METHODS='symlink copy'
@@ -20,12 +24,8 @@ CREATED_DIRS_CACHE=''
 CREATED_FILES_CACHE=''
 
 RED='\e[31m'
-# shellcheck disable=SC2034
-BOLD='\e[1m'
 GRAY='\e[90m'
 WHITE='\e[0m'
-# shellcheck disable=SC2034
-GREEN='\e[32m'
 YELLO='\e[33m'
 
 VERBOSE=0
@@ -34,7 +34,7 @@ FORCE=0
 ############################## OUTPUT ##############################  
 
 ##
-# print usage information to the user
+# responsible for printing the usage of the command to the user
 ##
 usage() {
 cat << EOF
@@ -59,7 +59,10 @@ EOF
 }
 
 ##
-# prints info to the user if the global flag $VERBOSE is set
+# prints verbose output to the user
+#
+# prints info to the user if the global flag $VERBOSE is greater than
+# 0 ($VERBOSE should be set to 1 for verbose output).
 #
 # @1 - the message to display to the user 
 ##
@@ -79,7 +82,7 @@ warn() {
 }
 
 ##
-# displays an error to the user in red
+# displays an unrecoverable error to the user
 #
 # @1 - the error message to display
 ##
@@ -90,12 +93,11 @@ error() {
 ##
 # prompts the user to resolve a file conflict
 #
-# the function prompts the user to overwrite a file, allowing the user to
-# respond with Y\N with Y as a default. the function returns true if the user
-# would like to overwrite the file, and false otherwise.
+# this function prompts the user to overwrite a given file, allowing
+# the user to respond with Y\N (with Y as a default).
 #
 # @1      - the name of the file to prompt the user to overwrite 
-# @return - true for overwrite, false for keeping the original
+# @return - true for overwrite (yes), false otherwise
 ##
 prompt_conflict() {
     warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
@@ -118,8 +120,7 @@ prompt_conflict() {
 # @return - the string in all lowercase
 ##
 to_lowercase() {
-    res="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
-    printf '%s' "$res"
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
 ##
@@ -130,34 +131,30 @@ to_lowercase() {
 # @return - true if the string starts with the substr, false otherwise
 ##
 starts_with() {
-    # match at the start of a line
-    find_regex='^'"$1"
-
-    res="$(echo "$2" | grep -Eo "$find_regex")"
-
-    # empty response is no match
-    if [ -n "$res" ]; then
-        return 0
-    fi
+    regex='^'"$1"
+    masked="$(printf '%s' "$2" | $GREP -E "$regex")" 
+    
+    # if we match grep returns something
+    [ -n "$masked" ] && return 0
     return 1
 }
 
 ##
-# shorthand for repeating a string n number of times
+# repeat a string n number of times 
 # 
 # @1      - the number of times to repeat the string
 # @2      - the string to repeat
 # @return - the string (@2) repeated @1 number of times
-#           (eq to python str * num)
 ##
 repeat_str() {
-    res=''
+    result=''
     i=0
     while [ "$i" -lt "$1" ]; do
-        res="$res""$2"
+        result="$result""$2"
         i=$((i+1))
     done
-    printf '%s' "$res"
+
+    printf '%s' "$result"
 }
 
 #################### ARRAYS ####################  
@@ -165,63 +162,57 @@ repeat_str() {
 ##
 # reads the given file into a space-separated string 'array'
 #
-# the function reads the given file into a string, replacing every encountered
-# newline with a space. note: any spaces in the file will be interpreted as a
-# new element in the 'array' 
+# the function reads the given file into a string with each new line
+# being interpreted as a space. 
 #
-# @1      - the file to read into an 'array'
-# @return - the string 'array'
+# @1      - the file to read
+# @return - the string array
 ##
 file_to_array() {
-    filtered_content="$(tr '\n' ' ' < "$1")"
+    # if the file doesn't exist return empty array and error
+    ! [ -f "$1" ] && { printf '%s' ""; return 1; }
 
-    printf '%s' "$filtered_content"
+    replaced="$(tr '\n' ' ' < "$1")"
+    printf '%s' "$replaced"
 }
 
 ##
-# checks whether or not a string is in an 'array'
+# checks whether or not a string is in a string array
 #
-# the function iterates through an 'array' of space separated elements and
-# returns whether or not the given string is equal to any element in the 'array'
-#
-# @1      - the 'array' in which to search
-# @2      - the string to search for in the 'array'
-# @return - 0 if the string is in the 'array', 1 otherwise
+# @1      - the item to search for in the array
+# @2      - the string array to search
+# @return - 0 if the string is in the array, 1 otherwise
 ##
 in_array() {
-    for element in $1; do
-        if [ "$2" = "$element" ]; then
-            return 0
-        fi
-    done
+    regex="$1"'( |$)'
+    masked="$(printf '%s' "$2" | $GREP -E "$regex")"
+
+    # if we match return 0
+    [ -n "$masked" ] && return 0
     return 1
 }
 
 ##
-# takes a file glob and a directory and returns the files that match the glob
-# in the directory in the form of a space separated string.
+# takes a glob pattern and an (optional) directory and returns the
+# files that match the glob in the directory.
 # 
 # @1      - the glob to use in the directory
-# @2      - the directory in which to search - can be omitted
-#           to match in the current directory
-# @return - sh 'array' of the files that match the glob
+# @2      - the directory in which to search (can be omitted
+#           to match in the current directory)
+# @return - string array of the files that match the glob, or
+#           nothing if the glob doesn't match
 ##
-collect_file_glob() {
-    collected_files=''
-    full_glob="$1"
+collect_glob() {
+    matches=''
+    glob="$1"
 
-    # append directory to glob if it exists
-    [ -n "$2" ] && full_glob="$2"'/'"$full_glob"
+    # append directory arg to glob
+    [ -n "$2" ] && glob="$2"'/'"$glob"
 
-    for file in $full_glob; do
-        collected_files="$collected_files"' '"$file"
-    done
+    # shellcheck disable=SC2086
+    matches="$($LS $glob 2>/dev/null)"
 
-    if [ ! "${file# }" = "$full_glob" ]; then
-        printf '%s' "$collected_files"
-    else
-        printf ''
-    fi
+    printf '%s' "$matches"
 }
 
 #################### FILE SYSTEM ####################  
@@ -230,160 +221,142 @@ collect_file_glob() {
 # correct a given path with an offset to the root level directory
 #
 # @1      - the path to correct
-# @return - the corrected path 
+# @return - the corrected path (can be the same as the input path) 
 ##
 submodule_path_correct() {
-    if [ -z "$DDM" ]; then
-        printf '%s' "$1"
-    else
-        num_above=$((DDM*2))
-        above_relpath="$(repeat_str "$num_above" '../')"
+    # if the nest variable is not set we aren't recursing 
+    [ -z "$DDM" ] && { printf '%s' "$1"; return; }
 
-        printf '%s%s' "$above_relpath" "$1"
-    fi
+    # create the relative path correction
+    correction="$(repeat_str $((DDM * 2)) '../')"
+
+    printf '%s%s' "$correction" "$1"
 }
 
 ##
-# abstraction over caching the creation of a file/directory 
+# add a newly created directory or file to the appropriate cache
+# for later retrieval
 #
-# @1 - the newly created file/directory to log
+# @1      - the newly created file/directory to log
+# @return - whether or not the node was successfully logged
 ##
-log_creation() {
-    offset_dirs_file="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
-    offset_links_file="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
+log_node() {
+    corrected_dirs_cache="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
+    corrected_files_cache="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
 
-    if [ -d "$1" ]; then
-        echo "$1" >> "$offset_dirs_file" 
-    else
-        echo "$1" >> "$offset_links_file"
-    fi
+    # log into the dirs cache file if we created a directory
+    [ -d "$1" ] && { echo "$1" >> "$corrected_dirs_cache"; return 0; }
+
+    # log into the files cache file if we created a file (copying) or a link
+    [ -f "$1" ] || [ -L "$1" ] && { echo "$1" >> "$corrected_files_cache"; return 0; }
+
+    # file is neither a directory, file, or symlink - something's wrong
+    return 1
 }
 
 ##
 # preemptive conflict detection and resolution
 #
-# the function first checks whether or not a file exists at a given
-# destination. if the file does exist, it then checks the global $FORCE flag
-# and returns true if it's set. otherwise, it prompts the user to overwrite it,
-# returning true if the user would like to overwrite it, otherwise returning
-# false. 
+# the function first checks whether or not a given file exists. if the file
+# does exist, it then checks the global $FORCE flag and returns true if it's
+# set; otherwise, it prompts the user to overwrite it, returning the user's
+# decision 
 #
 # @1      - the destination file to check
 # @return - 0 for a successful resolution, 1 if a conflict could 
 ##
 resolve_file_conflict() {
-    if [ -e "$1" ]; then
-        if in_array "$CREATED_FILES_CACHE" "$1"; then
-            info "skipping '""$(basename "$1")""'; already installed"
-            return 1
-        fi
+    # if the file doesn't exist we don't have a problem
+    ! [ -e "$1" ] && return 0
 
-        if [ "$FORCE" -gt 0 ]; then
-            warn "force enabled overriding '""$1""' with symlink"
-            return 0
-        else
-            if ! prompt_conflict "$1"; then
-                info "skipping '""$(basename "$1")""'"
-                return 1
-            fi
-        fi
+    # if it's in the files we've created we can skip
+    if in_array "$1" "$CREATED_FILES_CACHE"; then
+        info "skipping '""$(basename "$1")""'; already installed"
+        return 1
+    fi
+
+    # if force is enabled we can override
+    if [ "$FORCE" -gt 0 ]; then
+        warn "force enabled overriding '""$1""' with symlink"
+        return 0
+    fi
+
+    if ! prompt_conflict "$1"; then
+        info "skipping '""$(basename "$1")""'"
+        return 1
     fi
 }
 
 ##
-# create a symlink with the globally defined $LN
+# create a symlink between the source file path and a given destination
 #
-# the function links a given source to a given destination, logging the
-# operation to the console for the user to read as well as logging the created
-# destination to ddm's cache files for later removals.
-#
-# @1      - source file's path 
-# @2      - the destination path 
+# @1      - source file path 
+# @2      - destination path 
 # @return - 0 for link success, 1 for failure
 ##
 logged_ln() {
-    filename="$(basename "$1")"
-    full_dest="$2"'/'"$filename"
+    # log and suppress error msg
+    $LN "$1" "$2" 2>/dev/null
 
-    info "linking '""$1""' to '""$2"
+    # if the symlink doesn't exist we weren't able to link
+    ! [ -h "$2" ] && { error "failed to create symlink in '""$2""'"; return 1; }
 
-    if $LN "$1" "$2"; then
-        log_creation "$full_dest"
-        return 0
-    else
-        error "cannot create symlink in '""$2""'" 
-        return 1
-    fi 
+    log_node "$2"
+    return 0
 }
 
 ##
 # copy a file to a destination and log a success
 #
-# @1      - the source path
-# @2      - the destination path
-# @return - 0 for a copy success, 1 otherwise
+# @1      - source file path
+# @2      - destination path
+# @return - 0 for a copy success, 1 for failure 
 ##
 logged_cp() {
-    filename="$(basename "$1")"
-    full_dest="$2"'/'"$filename"
+    # copy and suppress error msg
+    $CP "$1" "$2" 2>/dev/null
 
-    info "copying '""$1""' to '""$2"
+    # if the file doesn't exist we weren't able to copy
+    ! [ -f "$2" ] && { error "failed to copy file to '""$2""'"; return 1; }
 
-    if $CP "$1" "$2"; then
-        log_creation "$full_dest"
-        return 0
-    else
-        error "cannot copy '""$filename""'to '""$2""'"
-        return 1
-    fi
+    log_node "$2"
+    return 0
 }
 
 ##
-# create a directory if it doesn't exist already
-#
-# the function creates a directory if it doesn't exist, logging the newly
-# created directory in ddm's cache files for later removals. the function
-# notifies the user that it has created a new directory.
+# create a directory if it doesn't already exist
 #
 # @1      - the path of the directory to create
 # @return - 0 on success, 1 for creation failure
 ##
 create_dir_if_not_exists() {
-    if [ ! -d "$1" ]; then
-        info "creating directory '""$1""' to store config files" 
+    # if the directory exists we do nothing
+    [ -d "$1" ] && return 0
 
-        if mkdir -p "$1"; then
-            log_creation "$1"
-            return 0
-        else
-            error "could not create install directory '""$1""'"
-            return 1
-        fi
-    fi
+    info "creating directory '""$1""' for confs" 
+
+    # create directory and log error if it occurs
+    ! $MKDIR "$1" && { error "could not create directory '""$1""'"; return 1; }
+    
+    log_node "$1"
     return 0
 }
 
 #################### FUNCTIONALITY ####################  
 
 ##
-# load persistent files into memory for easier processing
+# load persistent files into memory
 ##
-load_persistent_files() {
-    created_dirs_offset="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
-    created_links_offset="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
+populate_caches() {
+    # correct tld cache file paths for submodule recursion
+    dirs_cache_path="$(submodule_path_correct "$CREATED_DIRS_CACHE_FILE")"
+    files_cache_path="$(submodule_path_correct "$CREATED_FILES_CACHE_FILE")"
 
-    if [ -e "$created_dirs_offset" ]; then
-        # shellcheck disable=SC2034
-        CREATED_DIRS_CACHE="$(file_to_array "$created_dirs_offset")"
-    fi
-
-    if [ -e "$created_links_offset" ]; then
-        CREATED_FILES_CACHE="$(file_to_array "$created_links_offset")"
-    fi
-
-    if [ -e "$IGNORED_GLOBS_FILE" ]; then
-        IGNORED_GLOBS="$(file_to_array "$IGNORED_GLOBS_FILE")"
-    fi
+    # load caches with file_to_array function
+    # shellcheck disable=SC2034
+    CREATED_DIRS_CACHE="$(file_to_array "$dirs_cache_path")"
+    CREATED_FILES_CACHE="$(file_to_array "$files_cache_path")"
+    IGNORED_GLOBS="$(file_to_array "$IGNORED_GLOBS_FILE")"
 }
 
 ##
@@ -394,7 +367,7 @@ load_persistent_files() {
 # go-ahead, then it makes sure the configuration pack's in line with the spec,
 # meaning that the things that must exist are present
 #
-# @1      - the name of the application to verify
+# @1      - the name of the application
 # @return - 0 if the application meets the criterion for install,
 #           1 otherwise
 ##
@@ -402,44 +375,41 @@ can_install() {
     verify_script="$1"'/inst.sh'
     go_ahead=1
 
-    # check the go_ahead
     if [ -x "$verify_script" ]; then
-        if $SH "$verify_script"; then
-            go_ahead=0
-        fi
+        $SH "$verify_script" && { go_ahead=0; }
     else
-        if [ -n "$(command -v "$appname")" ]; then
-            go_ahead=0
-        fi
+        # if the verification script doesn't exist use the default
+        # method of checking if the command can be run
+        [ -n "$(command -v "$appname")" ] && { go_ahead=0; }
     fi
 
-    # don't check spec; exit without go-ahead
-    [ ! "$go_ahead" ] && return 1
+    # perform no further checking without go-ahead;
+    # we know that we cannot install
+    [ ! "$go_ahead" ] && { return 1; }
 
-    # check that conf file dir exists
-    confs_location="$1"'/conf'
-    [ ! -d "$confs_location" ] && return 1
+    # make sure conf directory exists
+    conf_path="$1"'/conf'
+    ! [ -d "$conf_path" ] && { return 1; }
 
     return 0
 }
 
 ##
-# takes a file/directory name and returns whether or not it's in any of the
-# ddmignore matches.
+# takes a path and returns whether it matches any of the patterns
+# in the ignore cache.
 #
 # @1      - the directory/file name to check against
-# @return - 0 if the directory should be ignored, 1 otherwise 
+# @return - 0 if the directory is in the ignore cache, 1 otherwise 
 ##
 is_ignored() {
-    # shortcut - if there is no cache everything matches
-    if [ -z "$IGNORED_GLOBS" ]; then
-        return 1
-    fi
+    # if the cache is empty, no pattern matches in it
+    [ -z "$IGNORED_GLOBS" ] && { return 1; }
 
     for ignore in $IGNORED_GLOBS; do
-        if starts_with "$ignore" "$1"; then
-            return 0
-        fi
+        # if any of our patterns matches the path we exit;
+        # this relies on starts_with's internal implementation
+        # detail of a regex search to complete searches 
+        starts_with "$ignore" "$1" && { return 0; }
     done
     return 1
 }
@@ -447,9 +417,9 @@ is_ignored() {
 ##
 # installs an application with its installation properties
 #
-# the function sets up default installation properties, then allows the
-# application's meta file to override them; the function then installs the
-# application
+# the function sets up default installation properties, then
+# allows the application's meta file to override them; the
+# function then installs the application
 #
 # @1      - the name of the application to install
 # @return - 0 for a successful install, 1 for any error
@@ -461,61 +431,73 @@ install_config() {
     # setup default install variables
     install_dir="$HOME""/.config/""$1"
     install_method="symlink"
-
+    
+    # override defaults if meta script exists
     if [ -x "$meta_script" ]; then
         # shellcheck disable=SC1090
         . "$meta_script"
     fi
 
-    # check installation properties for validity
-
-    # check install directory 
-    if ! create_dir_if_not_exists "$install_dir"; then
-        return 1;
-    fi
+    # perform sanity checks on install variables
 
     # check install method
-    if ! in_array "$VALID_INSTALL_METHODS" "$install_method"; then
-        error "unrecognized install_method: '""$install_method""'"
+    if ! in_array "$install_method" "$VALID_INSTALL_METHODS"; then
+        error "'""$install_method""' is not a valid install method for '""$1""'"
         return 1
     fi
 
-    info "installing '""$1""' configurations to '""$install_dir""'"
+    # check install directory 
+    ! create_dir_if_not_exists "$install_dir" && { return 1; } 
 
-    conf_files=''
+    # notify the user that an install is progressing
+    info "installing '""$1""' confs"
+
+    # setup configuration searching
     confs_location="$1"'/conf'
+    unset confs
 
-    # normally globs don't match dotfiles - so we need two passes, once to 
+    # normally globs don't match dotfiles so we need two passes, once to 
     # pick up the dotfiles, another to pick up any other files
-    conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
-    conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
+    confs="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
+    confs="$confs""$(collect_glob '*' "$confs_location")"
 
-    # store install function for repeated use
-    install_fn=''
-    if [ "$install_method" = "symlink" ]; then
-        install_fn=logged_ln
-    elif [ "$install_method" = "copy" ]; then
-        install_fn=logged_cp
-    fi
+    # derive and cache install function 
+    case "$install_method" in
+        "symlink")
+            install_fn=logged_ln
+            fname_pretty='linking'
+            ;;
+        "copy")
+            install_fn=logged_cp
+            fname_pretty='copying'
+            ;;
+        *)
+            error "unreachable; unknown install method '""$install_method""'"
+            return 1
+            ;;
+    esac
 
-    # iterate through files linking to the right location
-    for to_copy in $conf_files; do
-        to_copy_name="$(basename "$to_copy")"
-        destination="$install_dir"'/'"$to_copy_name"
+    for conf in $confs; do
+        conf_fname="$(basename "$conf")"
+        dest_path="$install_dir"'/'"$conf_fname"
+        src_path="$(realpath "$conf")"
 
-        if ! resolve_file_conflict "$destination"; then
-            continue
-        fi
+        # pretty-print current file operation
+        info "$fname_pretty"" '""$conf""' to '""$install_dir""'" 
 
-        $install_fn "$to_copy" "$install_dir"
+        # pre-emptively resolve file conflicts
+        ! resolve_file_conflict "$dest_path" && continue
+
+        # install with fully qualified paths
+        $install_fn "$src_path" "$dest_path"
     done
 }
 
 ##
 # processes submodules by creating a child instance of ddm
 #
-# handles setting the DDM environment variable, then makes another ddm instance
-# in the given submodules folder.
+# handles setting the DDM environment variable, then makes
+# another ddm instance in the given submodules folder.
 #
 # @1      - the application for which to install the submodules
 # @return - 1 if for failure for any reason (including non-existent
@@ -561,16 +543,18 @@ process_submodules() {
 ############################## SUBCOMMANDS ##############################  
 
 ##
-# installs all application packages in the given directory by first checking if
-# they can be installed, then running the install_config command on them; this
-# is the main driver behind all application configuration installation
+# installs all application packages in the given directory by
+# first checking if they can be installed, then running the
+# install_config command on them; this is the main driver behind
+# all application configuration installation
 ##
 install() {
-    load_persistent_files
+    populate_caches
 
-    for folder in $(collect_file_glob '*/'); do
+    for folder in $(collect_glob '*/'); do
         appname="$(basename "$folder")"
 
+        # skip the folder if it is in the .ddmignore
         if is_ignored "$folder"; then
             info "skipping '""$appname""'; excluded in ddmignore"
             continue
@@ -582,76 +566,72 @@ install() {
             continue
         fi
 
+        # install associated configuration files
         install_config "$appname"
 
-        # process submodules
+        # process submodule (if it exists)
         process_submodules "$appname"
     done
 }
 
 ##
-# uses the corresponding cache files to remove the installed symlinks and
-# folders, first removing the symlinks, then removing the empty folders that
-# remain (and leaving the ones that aren't empty)
+# uses the corresponding cache files to remove the installed
+# symlinks and folders, first removing the symlinks, then
+# removing the empty folders that remain (and leaving the ones
+# that aren't empty)
 ##
 uninstall() {
     # if no cache files exist we should warn the user about it and exit
     if [ ! -f "$CREATED_FILES_CACHE_FILE" ] && [ ! -f "$CREATED_DIRS_CACHE_FILE" ]; then
-        error 'cache files do not exist; are you sure you installed?'
+        warn 'cache files do not exist; are you sure you installed?'
         return 1
     fi
 
-    # remove cached created symlinks
-    if [ -f "$CREATED_FILES_CACHE_FILE" ]; then
-        # shellcheck disable=SC2013
-        for created_file in $(cat "$CREATED_FILES_CACHE_FILE"); do
-            if [ -e "$created_file" ]; then
-                info 'removing file "'"$created_file"'"'
-                rm "$created_file"
-            fi
-        done
-    fi
+    # attempt to remove created files/symlinks
+    created_files="$(file_to_array "$CREATED_FILES_CACHE_FILE")"
+    for file in $created_files; do
+        # remove the file redirecting errors
+        [ -e "$file" ] && { info "removing file '""$file""'"; $RM "$file" 2>/dev/null; }
 
+        # make sure that the file has been deleted
+        [ -e "$file" ] && { error "could not remove file '""$file""'"; continue; }
+    done
 
-    # remove empty created folders
-    if [ -f "$CREATED_DIRS_CACHE_FILE" ]; then
-        # shellcheck disable=SC2013
-        for created_folder in $(cat "$CREATED_DIRS_CACHE_FILE"); do
-            # attempt to remove
-            $RMDIR "$created_folder"
+    # attempt to remove created directories
+    created_dirs="$(file_to_array "$CREATED_DIRS_CACHE_FILE")"
+    for directory in $created_dirs; do
+        $RMDIR "$directory"
 
-            # check if remove worked and inform user
-            if [ -d "$created_folder" ]; then
-                warn 'could not remove directory "'"$created_folder"'"; not empty'
-            else
-                info "removed directory '""$created_folder""'"
-            fi
-        done
-    fi
+        # check if the directory still exists
+        [ -d "$directory" ] && { warn "could not remove directory '""$directory""'"; continue; }
 
-    rm -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_FILES_CACHE_FILE"
+        # notify the user that we deleted a directory
+        info "removed directory '""$directory""'"
+    done
+
+    # remove caches after use
+    $RM -f "$CREATED_DIRS_CACHE_FILE" "$CREATED_FILES_CACHE_FILE"
 }
 
 ##
-# goes through the list of created files that are not symlinks and copied their
-# modified content back to the source directory for later version control
-# integration
+# goes through the list of created files that are not symlinks
+# and copied their modified content back to the source directory
+# for later version control integration
 ##
 adopt() {
-    load_persistent_files
+    populate_caches
 
-    for folder in $(collect_file_glob '*/'); do
-        appname="$(basename "$folder")"
+    for appfolder in $(collect_glob '*/'); do
+        appname="$(basename "$appfolder")"
 
-        is_ignored "$folder" && continue
-
+        # skip if not an installation candidate
+        is_ignored "$appfolder" && continue
         ! can_install "$appname" && continue
 
         # load install dir variable
         install_dir="$HOME"'/.config/'"$appname"'/'
-        install_method="symlink"
 
-        meta_script="$folder"'meta'
+        meta_script="$appfolder"'meta'
         if [ -x "$meta_script" ]; then
             # shellcheck disable=SC1090
             . "$meta_script"
@@ -660,28 +640,26 @@ adopt() {
         # skip re-adopting symlinks
         [ "$install_method" = 'symlink' ] && continue
 
-        confs_location="$folder"'conf/'
-        # collect configuration files
-        conf_files="$(collect_file_glob "$DOTFILES_GLOB" "$confs_location")"
-        conf_files="$conf_files""$(collect_file_glob '*' "$confs_location")"
+        # collect files in install directory 
+        dest_files="$(collect_glob "$DOTFILES_GLOB" "$install_dir")"
+        dest_files="$dest_files""$(collect_glob '*' "$install_dir")"
 
-        for conf in $conf_files; do
-            conf_filename="$(basename "$conf")"
-            destination="$install_dir""$conf_filename"
+        for dest_conf in $dest_files; do
+            dconf_fname="$(basename "$dest_conf")"
 
-            # skip if configuration not copied
-            ! [ -e "$destination" ] && continue
+            # work out potential corresponding source file for a
+            # given destination file
+            src_conf="$appfolder"'conf/'"$dconf_fname"
 
-            info "adopting file '""$destination""'"
+            # if the corresponding file doesn't exist, continue
+            ! [ -f "$src_conf" ] && { continue; }
 
-            cp -L "$destination" "$conf"
+            # copy the destination back to the source
+            cp -L "$dest_conf" "$src_conf"
         done
 
-        # call submodules
-        sub_folder="$folder"'sub'
-        if [ -d "$sub_folder" ]; then
-            process_submodules "$sub_folder"
-        fi
+        # call submodules if they exist
+        [ -d "$appfolder"'sub' ] && { process_submodules "$appname"; }
     done
 }
 

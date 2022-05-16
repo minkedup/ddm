@@ -1,7 +1,8 @@
 setup() {
-    load 'test_helper/bats-support/load' # this is required by bats-assert!
-    load 'test_helper/bats-assert/load'
-    load 'test_helper/bats-file/load'
+    # load utility assert functions before test invocations
+    load 'test_helper/bats-support/load' # required for bats-assert 
+    load 'test_helper/bats-assert/load'  # easy rust-like assertions
+    load 'test_helper/bats-file/load'    # file-specific  assertions
 
     # store overwritten path
     DDM_BASE_DIR="$(pwd)"
@@ -16,51 +17,6 @@ setup() {
 
     # move into test env for tests
     cd "$DDM_TEST_SRC"
-
-    # setup test environment
-    setup_fake_testenv
-}
-
-setup_fake_testenv() {
-    create_fake_application "$DDM_TEST_SRC" 'foo' "$DDM_TEST_DEST"
-    create_fake_application "$DDM_TEST_SRC" 'bar' "$DDM_TEST_DEST"
-    create_fake_application "$DDM_TEST_SRC" 'foobar' "$DDM_TEST_DEST"
-    create_fake_application "$DDM_TEST_SRC" 'recursive' "$DDM_TEST_DEST"
-
-    echo 'foobar' >> .ddmignore
-}
-
-##
-# creates a fake application in a directory with a name
-#
-# @1 - the source directory path 
-# @2 - the application name
-# @3 - the fake destination path (.config alternative)
-##
-create_fake_application() {
-    appname="$2"
-    source_dir="$1"
-    dest_dir="$3"
-
-    appdir="$source_dir"'/'"$appname"
-    confdir="$appdir"'/conf'
-
-    config_name="$appname"'-conf'
-    inst_script="$appdir"'/inst.sh'
-    meta_script="$appdir"'/meta'
-
-    install_location="$dest_dir"'/config/'"$confname"
-
-    mkdir "$appdir"
-
-    echo 'return 0' >> "$inst_script" 
-    chmod +x "$inst_script"
-
-    echo 'install_dir='"$install_location" > "$meta_script"
-    chmod +x "$meta_script"
-    
-    mkdir "$confdir"
-    touch "$confdir"'/'"$config_name"
 }
 
 teardown() {
@@ -68,216 +24,281 @@ teardown() {
     rm -rf "$DDM_TEST_SRC" "$DDM_TEST_DEST"
 }
 
+# tests that parsing the ddm script returns no errors or warnings
+# - all warnings should be suppressed 
 @test 'passes_shellcheck' {
     run shellcheck "$DDM_BASE_DIR"'/ddm'
     assert_success
 }
 
 @test 'to_lowercase' {
-    input='AbCdEfG'
-    expected_output='abcdefg'
+    in='AbCdEfG'
+    out='abcdefg'
 
-    run to_lowercase "$input"
+    run to_lowercase "$in"
+    assert_output "$out"
 
-    assert_output "$expected_output"
+    in='abcdefg'
+    run to_lowercase "$in"
+    assert_output "$out"
 }
 
 @test 'starts_with' {
     # test with a valid sub-string
-    to_search='this is an example string'
+    search='this is an example string'
     starts_with='this'
 
-    run starts_with "$starts_with" "$to_search"
+    run starts_with "$starts_with" "$search"
     assert_success
 
     # test with an invalid substring
-    starts_with='not in string'
-
-    run starts_with "$starts_with" "$to_search"
+    starts_with='is'
+    run starts_with "$starts_with" "$search"
     assert_failure
 }
 
 @test 'repeat_str' {
-    to_repeat='n'
+    repeat='n'
     amount=5
-    expected_output='nnnnn'
+    out='nnnnn'
 
-    run repeat_str "$amount" "$to_repeat"
-    assert_output "$expected_output"
+    run repeat_str "$amount" "$repeat"
+    assert_output "$out"
 }
 
 @test 'file_to_array' {
-    expected_output='el1 el2 el3 ' #extra space important
-    array_file='to_array'
+    out='el1 el2 el3 '
+    test_file='test_array'
 
-    # setup file
-    echo 'el1' >> "$array_file"
-    echo 'el2' >> "$array_file"
-    echo 'el3' >> "$array_file"
+    # setup test file one
+    echo 'el1' >> "$test_file"
+    echo 'el2' >> "$test_file"
+    echo 'el3' >> "$test_file"
 
-    run file_to_array "$array_file"
-    assert_output "$expected_output"
-}
-
-@test 'in_array' {
-    mock_array='el1 el2 el3 el4 el5 el6'
-    to_find='el2'
-
-    run in_array "$mock_array" "$to_find"
+    # assert success on valid file
+    run file_to_array "$test_file"
+    assert_output "$out"
     assert_success
 
-    to_find='el7'
-
-    run in_array "$mock_array" "$to_find"
+    # assert correct handling of non-existent file
+    run file_to_array 'does_not_exist'
+    assert_output ''
     assert_failure
 }
 
-@test 'collect_file_glob' {
-    # we use the test env created in setup 
-    # to match for foo
+@test 'in_array' {
+    arr='el1 el2 el3 el4 el5 el6'
+    to_find='el2'
+
+    # existent element
+    run in_array "$to_find" "$arr"
+    assert_success
+
+    # non-existent element
+    to_find='el7'
+    run in_array "$to_find" "$arr"
+    assert_failure
+
+    # partial match rejection
+    to_find='el'
+    run in_array "$to_find" "$arr"
+    assert_failure
+}
+
+@test 'collect_glob' {
+    # setup test folder in env to match
+    mkdir foobar barfoo foo fond
     glob='foo*'
 
-    # paths are absolute
-    expected_output=' foo foobar'
+    # ls globbing produces weird, but acceptable
+    # spacing for arrays
+    expected_output='foo  foobar'
 
-    run collect_file_glob "$glob"
+    run collect_glob "$glob"
     assert_output "$expected_output"
 }
 
 @test 'submodule_path_correct' {
     # test when no recursion is enabled
-    test_path='rootlevel'
-    expected_output='rootlevel'
+    test_path='tld'
+    out='tld'
 
     run submodule_path_correct "$test_path"
-    assert_output "$expected_output"
+    assert_output "$out"
 
     # test when recursion enabled
     export DDM='2'
-    expected_output='../../../../rootlevel'
+    out='../../../../tld'
 
     run submodule_path_correct "$test_path"
-    assert_output "$expected_output"
+    assert_output "$out"
 
     unset DDM
 }
 
-@test 'log_creation' {
-    created_dir="$DDM_TEST_DEST"'/created_dir'
-    created_file="$DDM_TEST_DEST"'created_file'
+@test 'log_node' {
+    dir_log='.created_dirs'
+    file_log='.created_files'
 
-    dir_log_file='.created_dirs'
-    file_log_file='.created_files'
+    # setup function with fake data to operate on
+    created_dir="$DDM_TEST_DEST"'directory'
+    created_file="$DDM_TEST_DEST"'file'
+    created_link="$DDM_TEST_DEST"'symlink'
 
-    # create items to log
+    # create target for fake symlink
+    link_target="$DDM_TEST_SRC"'fake_target'
+    touch "$link_target"
+
+    # create fake nodes to log
     mkdir "$created_dir"
     touch "$created_file"
+    ln -s "$link_target" "$created_link"
 
     # test directory logging
-    run log_creation "$created_dir"
+    run log_node "$created_dir"
+    assert_success
 
-    assert_exists "$dir_log_file"
-    assert_file_contains "$dir_log_file" "$created_dir"
+    assert_exists "$dir_log"
+    assert_file_contains "$dir_log" "$created_dir"
 
     # test file logging
-    run log_creation "$created_file"
+    run log_node "$created_file"
+    assert_success
     
-    assert_exists "$file_log_file"
-    assert_file_contains "$file_log_file" "$created_file"
+    assert_exists "$file_log"
+    assert_file_contains "$file_log" "$created_file"
+
+    # test symlink logging
+    run log_node "$created_link"
+    assert_success
+
+    assert_exists "$file_log"
+    assert_file_contains "$file_log" "$created_link"
+
+    # test non-existent/non-handleable file
+    run log_node 'non_existent_node'
+    assert_failure
 }
 
 @test 'resolve_file_conflict' {
-    conflict_file='conflicted'
-    
-    # run with no conflict
-    run resolve_file_conflict
+    # file to test for conflict with
+    test_file="$DDM_TEST_DEST"'conflicted'
+
+    # run without a conflict (file doesn't exist) 
+    run resolve_file_conflict "$test_file"
     assert_success
 
-    touch "$conflict_file"
+    # create test file to simulate conflict
+    touch "$test_file"
 
-    # default Y case test
-    run resolve_file_conflict
+    # test a conflict where the user answers [ENTER] to override
+    resolve_default() {
+        printf '%s\n' '' | resolve_file_conflict "$test_file"
+    }
+
+    run resolve_default
     assert_success
 
-    # force case
-    FORCE=1
-    run resolve_file_conflict
+    # test a conflict where the user answers yes for an override
+    resolve_yes() {
+        printf '%s' 'Y' | resolve_file_conflict "$test_file"
+    }
+
+    run resolve_yes 
+    assert_success
+
+    # test a conflict where the user answers no for an override
+    resolve_no() {
+        printf '%s' 'N' | resolve_file_conflict "$test_file"
+    }
+
+    run resolve_no
+    assert_failure
+
+    # test that conflicts are overridden when FORCE is set
+    export FORCE=1
+    run resolve_file_conflict "$test_file"
     assert_success
 }
 
 @test 'logged_ln' {
-    src="$DDM_TEST_SRC"'/test_logged_link'
-    dest="$DDM_TEST_DEST"
-    full_dest="$DDM_TEST_DEST"'/test_logged_link'
+    link_name='testlink'
 
-    log_file='.created_files'
+    src_path="$DDM_TEST_SRC""$link_name"
+    dest_path="$DDM_TEST_DEST""$link_name"
 
-    # create file to symlink
-    touch "$src"
+    # create target file
+    touch "$src_path"
 
-    run logged_ln "$src" "$dest"
+    # test with target file
+    run logged_ln "$src_path" "$dest_path"
     assert_success
 
-    assert_exists "$log_file"
-    assert_file_not_empty "$log_file"
-
-    assert_link_exists "$full_dest"
+    assert_link_exists "$dest_path"
 }
 
 @test 'logged_cp' {
-    src="$DDM_TEST_SRC"'/test_logged_copy'
-    dest="$DDM_TEST_DEST"
-    full_dest="$DDM_TEST_DEST"'/test_logged_copy'
+    file_name='testfile'
 
-    log_file='.created_files'
+    src_path="$DDM_TEST_SRC""$file_name"
+    dest_path="$DDM_TEST_DEST""$file_name"
 
-    # create file to copy 
-    touch "$src"
+    # create source file
+    touch "$src_path"
 
-    run logged_cp "$src" "$dest"
+    run logged_cp "$src_path" "$dest_path"
     assert_success
 
-    assert_exists "$log_file"
-    assert_file_not_empty "$log_file"
-
-    assert_exists "$full_dest"
+    assert_exists "$dest_path"
+    assert_link_not_exists "$dest_path"
 }
 
 @test 'create_dir_if_not_exists' {
     target_dir="$DDM_TEST_DEST"'/does_not_exist'
 
+    # assert that creation works as expected
     run create_dir_if_not_exists "$target_dir"
     assert_success
     assert_exists "$target_dir"
+
+    # assert subsequent creations don't error
+    run create_dir_if_not_exists "$target_dir"
+    assert_success
 }
 
 @test 'can_install' {
-    test_application='foo'
+    # setup an example configuration to verify
+    mkdir -p "$DDM_TEST_SRC"'/foo/conf/' # create conf pack and conf dir 
 
-    run can_install "$test_application"
+    # create an always-install verification script
+    verify_script="$DDM_TEST_SRC"'/foo/inst.sh'
+    printf '%s' 'return 0' >> "$verify_script" 
+    chmod +x "$verify_script"
+
+    assert_file_executable "$verify_script"
+
+    run can_install 'foo' 
     assert_success
+
+    # non-existent application
+    run can_install 'bar'
+    assert_failure
 }
 
 @test 'is_ignored' {
     # statically set ignore globs which would
     # normally be loaded from file
-    IGNORED_GLOBS='foobar'
+    export IGNORED_GLOBS='foobar'
 
+    # test starting match
     run is_ignored 'foobar/'
     assert_success
 
+    # test partial match
+    run is_ignored 'foo/'
+    assert_failure
+
+    # test non-match
     run is_ignored 'something_else'
     assert_failure
-}
-
-@test 'install_config' {
-    # relies on test env setup
-    install_application='foo'
-    install_location="$DDM_TEST_DEST"'/config/foo-conf'
-
-    run install_config "$install_application"
-    assert_success
-
-    assert_exists "$install_location"
-    assert_link_exists "$install_location" # default install method
 }
