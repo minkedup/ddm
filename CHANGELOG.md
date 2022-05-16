@@ -2,7 +2,29 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
-## 0.4.1 - 2022-05-10
+## 0.4.2 - 2022-05-14
+#### Bug Fixes
+- attempted to simplify adopt functionality - (2a42111) - Mickey Polito
+- updated uninstall subcommand with new functions - (7c35823) - Mickey Polito
+- removed path construction from logged fns - (ef4c69b) - Mickey Polito
+- added additional docs to is_ignored - (78f4daa) - Mickey Polito
+- fixed ambiguity in install go ahead function - (c7d58b0) - Mickey Polito
+- added error handling for file_to_array - (131e4c3) - Mickey Polito
+- added better error handling to directory creation - (76443a9) - Mickey Polito
+- fixed error handling for copy function - (675e51b) - Mickey Polito
+- added shellcheck ignore directive for desired behavior - (d837cf2) - Mickey Polito
+- fixed log_node to have meaningful return - (c5be1a9) - Mickey Polito
+- updated file logging to account for symlinks - (d3afa11) - Mickey Polito
+- fixed regression introduced by in_array optimization - (cb5bec7) - Mickey Polito
+- simplified globbing function name - (ce8a38a) - Mickey Polito
+- optimized file globbing by removing for loop - (d6bcf53) - Mickey Polito
+#### Documentation
+- improved inline docs on adopt function - (821c4b2) - Mickey Polito
+- adjusted spacing in docstring for submodules - (4aa680b) - Mickey Polito
+- fixed documentation on file resolution function - (4a20804) - Mickey Polito
+- corrected the docstring of glob function - (2521da3) - Mickey Polito
+#### Refactoring
+- refactored string and output functions - (59b00de) - Mickey Polito
 
 - - -
 
