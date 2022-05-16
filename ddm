@@ -9,7 +9,7 @@ LS='/usr/bin/env ls -dC'
 RM='/usr/bin/env rm'
 GREP='/usr/bin/env grep'
 MKDIR='/usr/bin/env mkdir -p'
-RMDIR='rmdir --parents --ignore-fail-on-non-empty'
+RMDIR='rmdir -p' 
 
 VALID_INSTALL_METHODS='symlink copy'
 
@@ -489,7 +489,7 @@ install_config() {
         if resolve_file_conflict "$dest_path"; then
             # the user has indicated that they want to override, so delete
             # the file that currently exists to make room for new file
-            $RM "$dest_path"
+            [ -f "$dest_path" ] && { $RM "$dest_path"; }
         else
             # if we couldn't resolve the conflict skip over the file
             continue
@@ -607,7 +607,7 @@ uninstall() {
     # attempt to remove created directories
     created_dirs="$(file_to_array "$CREATED_DIRS_CACHE_FILE")"
     for directory in $created_dirs; do
-        $RMDIR "$directory"
+        $RMDIR "$directory" 2>/dev/null
 
         # check if the directory still exists
         [ -d "$directory" ] && { warn "could not remove directory '""$directory""'"; continue; }
