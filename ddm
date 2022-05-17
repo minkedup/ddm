@@ -485,13 +485,13 @@ install_config() {
         # pretty-print current file operation
         info "$fname_pretty"" '""$conf""' to '""$install_dir""'"
 
-        # check if the destination path exists and attempt resolve
+        # check whether or not the user wants to overwrite the dest_path
         if resolve_file_conflict "$dest_path"; then
             # the user has indicated that they want to override, so delete
             # the file that currently exists to make room for new file
             [ -f "$dest_path" ] && { $RM "$dest_path"; }
         else
-            # if we couldn't resolve the conflict skip over the file
+            # if we couldn't resolve the conflict skip the file
             continue
         fi
 
