@@ -2,6 +2,21 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.4.3 - 2022-05-17
+#### Bug Fixes
+- changed usage of rmdir to be posix compliant - (c230d62) - Mickey Polito
+- added posix compatibility to cp command usage - (e4c0c7a) - Mickey Polito
+- fixed path pre-check regression - (492e9a8) - Mickey Polito
+#### Documentation
+- corrected comments in overwrite checking - (bacc543) - Mickey Polito
+#### Miscellaneous Chores
+- removed empty changelog release information - (f6c1421) - Mickey Polito
+- bumped version information in binary - (ddec59f) - Mickey Polito
+#### Tests
+- updated tests for changes in functions - (169716f) - Mickey Polito
+
+- - -
+
 ## 0.4.2 - 2022-05-14
 #### Bug Fixes
 - attempted to simplify adopt functionality - (2a42111) - Mickey Polito
