@@ -52,6 +52,7 @@ COMMANDS:
     install      Install application configurations
     uninstall    Remove installed application configurations
     adopt        Pull configuration data back to the source(s)
+    tree         List configuration packs in a tree-like way 
 
 OPTIONS:
     -f    Do not prompt for file conflicts
@@ -672,6 +673,11 @@ adopt() {
     done
 }
 
+##
+# goes through every directory in the current directory and
+# removes boilerplate/indicator folders from them before pretty
+# printing.
+##
 packtree() {
     populate_caches
 
