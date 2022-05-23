@@ -7,7 +7,7 @@ SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -sf'
 LS='/usr/bin/env ls -C'
 RM='/usr/bin/env rm'
-SED='/usr/bin/env sed'
+FIND='/usr/bin/env find'
 GREP='/usr/bin/env grep'
 MKDIR='/usr/bin/env mkdir -p'
 RMDIR='rmdir -p' 
@@ -15,6 +15,7 @@ RMDIR='rmdir -p'
 VALID_INSTALL_METHODS='symlink copy'
 
 DOTFILES_GLOB='.[!.]*'
+NORMFILE_GLOB='[!.]*'
 
 IGNORED_GLOBS_FILE='.ddmignore'
 CREATED_DIRS_CACHE_FILE='.created_dirs'
@@ -674,22 +675,40 @@ adopt() {
 packtree() {
     populate_caches
 
-    flat_layout="$($LS -R | $GREP -E ':$' | $GREP -Ev '(/conf|\.:|sub:$)' | $SED -E 's/(:$|\.\/)//g')"
-    tlds="$(printf '%s' "$flat_layout" | $GREP -Ev '(.*\/)' | $SED -E 's/$/\//g')"
+    # get subdirectories of all non-dotfile folders
+    # shellcheck disable=SC2086
+    listing="$($FIND $NORMFILE_GLOB -type d | $GREP -Ev '(\/conf|\/sub$)')"
 
-    for tld in $tlds; do
-        is_ignored "$tld" && continue 
+    # print tree head
+    printf '%s\n' '. conf packs'
 
-        subdir_regex='^'"$tld"
-        subdirs="$(printf '%s' "$flat_layout" | $GREP -E "$subdir_regex")"
+    i=0
+    n="$(printf '%s' "$listing" | wc -l)"
+    for folder in $listing; do
+        is_ignored "$folder"'/' && continue
+        
+        # matches top level directories (dirs without an ending /)
+        tld_mask="$(printf '%s' "$folder" | $GREP -Eo '^\w*$')"
 
-        fmted_subdirs="$(printf '%s' "$subdirs" | $SED -E 's/\w*\/(sub\/|)/    /g' | $SED -E 's/^/│/g' | $SED -E 's/( ){2}(\w*)$/ ├──\2/g')"
+        if [ -n "$tld_mask" ]; then
+            heading='├── '
 
-        fmted_tld="$(printf '%s' "$tld" | $SED -E 's/\/$//g')"
-        fmted_tld='├── '"$fmted_tld"
+            # print special heading for last tld 
+            [ "$i" -eq "$n" ] && heading='└── '
 
-        printf '%s\n' "$fmted_tld"
-        [ -n "$subdirs" ] && printf '%s\n' "$fmted_subdirs"
+            printf '%s\n' "$heading""$folder"
+        else
+            # extract name of subpack from path
+            subname="$(printf '%s' "$folder" | $GREP -Eo '\w*$')"
+
+            # get the slash characters from path to calculate depth
+            subslashes="$(printf '%s' "$folder" | $GREP -Eo '\/')"
+            before="$(repeat_str "${#subslashes}" ' ')"
+
+            printf '%s\n' '│'"$before"'└── '"$subname"
+        fi
+
+        i=$((i + 1))
     done
 }
 
