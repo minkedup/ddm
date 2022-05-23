@@ -7,6 +7,7 @@ SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -sf'
 LS='/usr/bin/env ls -C'
 RM='/usr/bin/env rm'
+SED='/usr/bin/env sed'
 GREP='/usr/bin/env grep'
 MKDIR='/usr/bin/env mkdir -p'
 RMDIR='rmdir -p' 
@@ -670,6 +671,28 @@ adopt() {
     done
 }
 
+packtree() {
+    populate_caches
+
+    flat_layout="$($LS -R | $GREP -E ':$' | $GREP -Ev '(/conf|\.:|sub:$)' | $SED -E 's/(:$|\.\/)//g')"
+    tlds="$(printf '%s' "$flat_layout" | $GREP -Ev '(.*\/)' | $SED -E 's/$/\//g')"
+
+    for tld in $tlds; do
+        is_ignored "$tld" && continue 
+
+        subdir_regex='^'"$tld"
+        subdirs="$(printf '%s' "$flat_layout" | $GREP -E "$subdir_regex")"
+
+        fmted_subdirs="$(printf '%s' "$subdirs" | $SED -E 's/\w*\/(sub\/|)/    /g' | $SED -E 's/^/│/g' | $SED -E 's/( ){2}(\w*)$/ ├──\2/g')"
+
+        fmted_tld="$(printf '%s' "$tld" | $SED -E 's/\/$//g')"
+        fmted_tld='├── '"$fmted_tld"
+
+        printf '%s\n' "$fmted_tld"
+        [ -n "$subdirs" ] && printf '%s\n' "$fmted_subdirs"
+    done
+}
+
 ############################## CLI PROCESSING ##############################
 
 # if testing return instead of exit
@@ -717,6 +740,8 @@ elif [ "$subcommand" = "uninstall" ]; then
     uninstall
 elif [ "$subcommand" = "adopt" ]; then
     adopt
+elif [ "$subcommand" = "tree" ]; then
+    packtree
 else
     error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."
     exit 1
