@@ -5,7 +5,7 @@ VERSION='0.4.3'
 CP='/usr/bin/env cp -L'
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -sf'
-LS='/usr/bin/env ls -dC'
+LS='/usr/bin/env ls -C'
 RM='/usr/bin/env rm'
 GREP='/usr/bin/env grep'
 MKDIR='/usr/bin/env mkdir -p'
@@ -210,7 +210,7 @@ collect_glob() {
     [ -n "$2" ] && glob="$2"'/'"$glob"
 
     # shellcheck disable=SC2086
-    matches="$($LS $glob 2>/dev/null)"
+    matches="$($LS -d $glob 2>/dev/null)"
 
     printf '%s' "$matches"
 }
