@@ -2,20 +2,20 @@
 
 ## Introduction
 
-The core unit that `ddm` works with is called a configuration pack, abbreviated
-`conf-pack`. In short, configuration pack contains metadata for how to install
-configuration files, coupled with configuration files themselves. Each
-configuration pack should target one application, but the standard is flexible
-enough to accommodate non-standard configurations.
+The core unit that `ddm` works with is called a **configuration pack**,
+abbreviated `conf-pack`. In short, configuration packs contains metadata for how
+to install configuration files, coupled with configuration files themselves.
+Each configuration pack should target one application, but the standard is
+flexible enough to accommodate non-standard use cases.
 
-Configuration packs reside within pack directories. The next section explains
-how configuration packs should be laid out within a pack directory, with the
-following section describing how configuration packs should be setup. 
+Configuration packs reside within **pack directories**. The next section
+explains how configuration packs should be laid out within a pack directory,
+with the following section describing how configuration packs should be setup. 
 
 ## The Pack Directory 
 
-`ddm` works within a pack directory when processing configuration packs. Each
-application should have a configuration pack named after it in the pack
+`ddm` always works within a pack directory when processing configuration packs.
+Each application should have a configuration pack named after it in the pack
 directory by convention.
 
 When `ddm` is first run, it treats the directory it is run in as a pack
@@ -24,19 +24,20 @@ configuration pack.
 
 ### .ddmignore file
 
-To allow users to have directories that are not processed by `ddm` in their pack
-directory, `ddm` supports ignoring files based on pattern matching. Users
-familiar with basic `.gitignore` file syntax should find `.ddmignore` files
-familiar.
+To allow users to have directories that are not treated as configuration packs
+in their pack directory, `ddm` supports ignoring files based on pattern
+matching. Users familiar with the `.gitignore` file syntax should find
+`.ddmignore` files familiar but more restrictive.
 
-`.ddmignore` files should consist of a newline separated list of patterns to
-exclude when looking for configuration packs. Each pattern will be matched
-against every directory that `ddm` encounters: if the pattern matches starting
-from the beginning of the directory name, `ddm` will skip that directory.
+Each pack directory may optionally contain a `.ddmignore` file. `.ddmignore`
+files should consist of a newline separated list of patterns to exclude when
+looking for configuration packs. Each pattern will be matched against every
+directory that `ddm` encounters: if the pattern matches starting from the
+beginning of the directory name, `ddm` will skip that directory.
 
-Behind the scenes, `ddm` inserts a `^` before each file name to check, then uses
-`grep -E` to perform a regex using the pattern. Thus, savvy users may wish to use
-more advanced regex patterns when writing a `.ddmignore` file.
+Behind the scenes, `ddm` inserts a `^` before each file that it checks against,
+then uses `grep -E` to perform a regex using the pattern. Thus, savvy users may
+wish to use more advanced regex patterns when writing a `.ddmignore` file.
 
 **Example**
 
@@ -58,32 +59,30 @@ $ cat .ddmignore
 bin/
 ```
 
-Please note that `.ddmignore` files don't support spaces. 
+Please note that `.ddmignore` files don't support spaces.
 
 ## Configuration Packs
 
 ### Configuration Files
 
 Each configuration pack must include a sub directory named `conf` that contains
-the configuration files for the application that the configuration package is
-targeting. More information about how `ddm` installs these configuration files
-can be found under the [install properties](#install-properties)
-section.
+the configuration files that are going to be installed for that configuration
+pack. More information about how `ddm` installs these configuration files can be
+found under the [install properties](#install-properties) section.
 
 ### Install Checking 
 
-Each configuration pack may include an `isnt.sh` script. This script will
-return true (0) to signal that the configuration files should be installed;
-otherwise, the script will return any non-zero return code to indicate that the
-configuration files should not be installed. This script will be called by `ddm`
-when it evaluates a configuration for installation. 
+Each configuration pack may include an `isnt.sh` script. This script will return
+`0` to signal that the configuration files should be installed; otherwise, the
+script will return any non-zero return code to indicate that the configuration
+files should not be installed. This script will be called by `ddm` when it
+evaluates a configuration for installation. 
 
-In the event that an configuration pack does not include an `inst.sh` script,
-the configuration files will be installed dependent on whether or not the
-application exists using the standard `command -v $(application_name)` (the
-`$application_name` being derived from the name of the directory of the
-configuration pack).
-
+In the event that a configuration pack does not include an `inst.sh` script, the
+configuration files will be installed dependent on whether or not the command
+exists. The command name to check against is derived from the name of the
+configuration pack directory.
+ 
 **NOTE - the** `inst.sh` **script must be executable!**
 
 ### Install Properties
@@ -92,7 +91,7 @@ Each configuration pack may include a `meta` file; this file will contain a
 variety of key-value pairs used by `ddm` to setup installation properties. A
 reference is included at the end of this section with each key and its default
 value, as well as a short description of how that variable effects `ddm`'s
-install behavior. 
+behavior.
 
 The `meta` file can be treated like a normal `sh` script, and should have access
 to any environment variable that an `sh` script would normally have access to.
@@ -120,15 +119,20 @@ install_method
 ### Submodules
 
 Each configuration pack may include a directory named `sub`; If this directory
-is present, after the parent configuration pack has finished its installation,
-`ddm` will treat the `sub` directory as its own pack directory. 
+is present, after the containing configuration pack has finished its
+installation, `ddm` will treat the `sub` directory as its own pack directory.
 
-There is currently no depth limit to submodules; However, submodules are not
-processed with any special considerations: a 'parent' being installed does not
-guarantee that a child configuration pack is installed. Each submodule will
-still need to create its own definition of when it should be installed with an
-`inst.sh` file. For more information about installation checking, check out the
+Submodules are not processed with any special considerations: a 'parent'
+configuration pack being installed does not guarantee that a 'child'
+configuration pack is installed. Each 'child' configuration pack inside will
+still need to define if it is going to be installed (i.e. with an `inst.sh`
+file). For more information about installation checking, check out the
 [installation checking section](#install-checking).
+
+Submodules, other than offering a logical grouping of configuration packs,
+guarantee installation ordering. Child configuration packs are guaranteed to be
+installed after their parent configuration pack is installed. However, the
+ordering of the installation of the submodules is not guaranteed.
 
 ### Example Configuration Pack
 
