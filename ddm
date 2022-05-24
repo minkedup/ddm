@@ -95,21 +95,24 @@ error() {
 }
 
 ##
-# prompts the user to resolve a file conflict
+# prompts the user to resolve a file conflict by overwriting,
+# adopting, or neither.
 #
-# this function prompts the user to overwrite a given file, allowing
-# the user to respond with Y\N (with Y as a default).
-#
-# @1      - the name of the file to prompt the user to overwrite
-# @return - true for overwrite (yes), false otherwise
+# @1       - path to show to user
+# @return  - 
+#     0 - Overwrite
+#     1 - Leave Alone
+#     2 - Adopt
+#     3 - Unknown
 ##
 prompt_conflict() {
-    warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
+    warn 'conflict at '"$1"'; do you want to overwrite, adopt, or leave alone?(O/A/n)? [O] '
     choice='y'
     read -r choice
     case $choice in
-        [Yy]*) return 0 ;;
+        [Oo]*) return 0 ;;
         [Nn]*) return 1 ;;
+        [Aa]*) return 2 ;;
     esac
 }
 
@@ -267,28 +270,37 @@ log_node() {
 # decision
 #
 # @1      - the destination file to check
-# @return - 0 for a successful resolution, 1 if a conflict could
+# @return - 0 for success, 2 for adoption, 1 to skip (failure) 
 ##
 resolve_file_conflict() {
-    # if the file doesn't exist we don't have a problem
+    # if the node doesn't exist we don't have a problem
     ! [ -e "$1" ] && return 0
+
+    dest_filename="$(basename "$1")"
 
     # if it's in the files we've created we can skip
     if in_array "$1" "$CREATED_FILES_CACHE"; then
-        info "skipping '""$(basename "$1")""'; already installed"
+        info "skipping '$dest_filename'; already installed"
         return 1
     fi
 
     # if force is enabled we can override
     if [ "$FORCE" -gt 0 ]; then
-        warn "force enabled overriding '""$1""' with symlink"
+        warn "force enabled overriding '""$1""'" 
         return 0
     fi
 
-    if ! prompt_conflict "$1"; then
-        info "skipping '""$(basename "$1")""'"
-        return 1
-    fi
+    # prompt the user for conflict resolution option
+    prompt_conflict "$1"
+
+    # propagate results & give user output
+    case $? in
+        0 ) return 0 ;; 
+        1 ) info "skipping '$dest_filename'"; return 1; ;;
+        2 ) info "adopting '$dest_filename'"; return 2; ;;
+    esac
+
+    return 1
 }
 
 ##
@@ -476,7 +488,7 @@ install_config() {
             fname_pretty='copying'
             ;;
         *)
-            error "unreachable; unknown install method '""$install_method""'"
+            error "unknown install method '""$install_method""'"
             return 1
             ;;
     esac
@@ -489,15 +501,19 @@ install_config() {
         # pretty-print current file operation
         info "$fname_pretty"" '""$conf""' to '""$install_dir""'"
 
-        # check whether or not the user wants to overwrite the dest_path
-        if resolve_file_conflict "$dest_path"; then
-            # the user has indicated that they want to override, so delete
-            # the file that currently exists to make room for new file
-            [ -f "$dest_path" ] && { $RM "$dest_path"; }
-        else
-            # if we couldn't resolve the conflict skip the file
-            continue
-        fi
+        # attempt to resolve file conflict if one exists 
+        resolve_file_conflict "$dest_path"
+
+        # continue on resolution error 
+        [ "$?" -eq 1 ] && continue
+
+        # adopt file if the user indicated they would like us to
+        # in conflict resolution - then continue as normal
+        [ "$?" -eq 2 ] && $CP "$dest_path" "$src_path"
+
+        # we get here if $? = 0 meaning the user wants to remove
+        # the file and overwrite if it exists - so we delete it
+        [ -f "$dest_path" ] && { $RM "$dest_path"; }
 
         # install with fully qualified paths
         $install_fn "$src_path" "$dest_path"
