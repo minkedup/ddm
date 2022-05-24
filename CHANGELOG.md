@@ -2,6 +2,18 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.0 - 2022-05-24
+#### Documentation
+- revised STANDARD documentation for submodules - (3f6fc9a) - Mickey Polito
+#### Features
+- added user script search and execution - (ea1c4e5) - Mickey Polito
+#### Miscellaneous Chores
+- bumped version in binary - (27db4c9) - Mickey Polito
+#### Refactoring
+- changed submodule processing to switch - (a0d9036) - Mickey Polito
+
+- - -
+
 ## 0.5.0 - 2022-05-23
 #### Documentation
 - updated docs and utility to match functionality - (f3dcc92) - Mickey Polito
