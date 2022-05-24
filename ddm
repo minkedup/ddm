@@ -1,12 +1,13 @@
 #!/usr/bin/env sh
 
-VERSION='0.4.3'
+VERSION='0.5.0'
 
 CP='/usr/bin/env cp -L'
 SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -sf'
-LS='/usr/bin/env ls -dC'
+LS='/usr/bin/env ls -C'
 RM='/usr/bin/env rm'
+FIND='/usr/bin/env find'
 GREP='/usr/bin/env grep'
 MKDIR='/usr/bin/env mkdir -p'
 RMDIR='rmdir -p' 
@@ -14,6 +15,7 @@ RMDIR='rmdir -p'
 VALID_INSTALL_METHODS='symlink copy'
 
 DOTFILES_GLOB='.[!.]*'
+NORMFILE_GLOB='[!.]*'
 
 IGNORED_GLOBS_FILE='.ddmignore'
 CREATED_DIRS_CACHE_FILE='.created_dirs'
@@ -50,6 +52,7 @@ COMMANDS:
     install      Install application configurations
     uninstall    Remove installed application configurations
     adopt        Pull configuration data back to the source(s)
+    tree         List configuration packs in a tree-like way 
 
 OPTIONS:
     -f    Do not prompt for file conflicts
@@ -210,7 +213,7 @@ collect_glob() {
     [ -n "$2" ] && glob="$2"'/'"$glob"
 
     # shellcheck disable=SC2086
-    matches="$($LS $glob 2>/dev/null)"
+    matches="$($LS -d $glob 2>/dev/null)"
 
     printf '%s' "$matches"
 }
@@ -670,6 +673,51 @@ adopt() {
     done
 }
 
+##
+# goes through every directory in the current directory and
+# removes boilerplate/indicator folders from them before pretty
+# printing.
+##
+packtree() {
+    populate_caches
+
+    # get subdirectories of all non-dotfile folders
+    # shellcheck disable=SC2086
+    listing="$($FIND $NORMFILE_GLOB -type d | $GREP -Ev '(\/conf|\/sub$)')"
+
+    # print tree head
+    printf '%s\n' '. conf packs'
+
+    i=0
+    n="$(printf '%s' "$listing" | wc -l)"
+    for folder in $listing; do
+        is_ignored "$folder"'/' && continue
+        
+        # matches top level directories (dirs without an ending /)
+        tld_mask="$(printf '%s' "$folder" | $GREP -Eo '^\w*$')"
+
+        if [ -n "$tld_mask" ]; then
+            heading='├── '
+
+            # print special heading for last tld 
+            [ "$i" -eq "$n" ] && heading='└── '
+
+            printf '%s\n' "$heading""$folder"
+        else
+            # extract name of subpack from path
+            subname="$(printf '%s' "$folder" | $GREP -Eo '\w*$')"
+
+            # get the slash characters from path to calculate depth
+            subslashes="$(printf '%s' "$folder" | $GREP -Eo '\/')"
+            before="$(repeat_str "${#subslashes}" ' ')"
+
+            printf '%s\n' '│'"$before"'└── '"$subname"
+        fi
+
+        i=$((i + 1))
+    done
+}
+
 ############################## CLI PROCESSING ##############################
 
 # if testing return instead of exit
@@ -717,6 +765,8 @@ elif [ "$subcommand" = "uninstall" ]; then
     uninstall
 elif [ "$subcommand" = "adopt" ]; then
     adopt
+elif [ "$subcommand" = "tree" ]; then
+    packtree
 else
     error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."
     exit 1
