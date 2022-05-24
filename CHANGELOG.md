@@ -2,6 +2,19 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.5.0 - 2022-05-23
+#### Documentation
+- updated docs and utility to match functionality - (f3dcc92) - Mickey Polito
+#### Features
+- added configuration pack tree listing - (7b30684) - Mickey Polito
+#### Miscellaneous Chores
+- updated version in ddm binary - (f135bb4) - Mickey Polito
+#### Refactoring
+- started work on tree feature - (df1409b) - Mickey Polito
+- changed LS to be more generalized for feat - (e6c40ae) - Mickey Polito
+
+- - -
+
 ## 0.4.3 - 2022-05-17
 #### Bug Fixes
 - changed usage of rmdir to be posix compliant - (c230d62) - Mickey Polito
