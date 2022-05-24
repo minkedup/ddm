@@ -7,6 +7,7 @@ SH='/usr/bin/env sh'
 LN='/usr/bin/env ln -sf'
 LS='/usr/bin/env ls -C'
 RM='/usr/bin/env rm'
+ENV='/usr/bin/env'
 FIND='/usr/bin/env find'
 GREP='/usr/bin/env grep'
 MKDIR='/usr/bin/env mkdir -p'
@@ -768,6 +769,8 @@ elif [ "$subcommand" = "adopt" ]; then
 elif [ "$subcommand" = "tree" ]; then
     packtree
 else
-    error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."
-    exit 1
+    $ENV 'ddm-'"$subcommand" "$@" 2>/dev/null && { exit 0; }
+
+    # env will return err code 127 if it cannot find the program 
+    [ "$?" -eq 127 ] && { error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."; exit 1; }
 fi
