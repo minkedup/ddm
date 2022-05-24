@@ -33,6 +33,7 @@ YELLO='\e[33m'
 
 VERBOSE=0
 FORCE=0
+ADOPT=0
 
 ############################## OUTPUT ##############################
 
@@ -56,8 +57,9 @@ COMMANDS:
     tree         List configuration packs in a tree-like way 
 
 OPTIONS:
-    -f    Do not prompt for file conflicts
     -v    Increase verbosity to debug levels
+    -f    Overwrite file conflicts
+    -a    Adopt file conflicts
     -h    Show this help
 EOF
 }
@@ -106,8 +108,13 @@ error() {
 #     3 - Unknown
 ##
 prompt_conflict() {
+    # give the user a prompt to contextualize their choice
     warn 'conflict at '"$1"'; do you want to overwrite, adopt, or leave alone?(O/A/n)? [O] '
-    choice='y'
+
+    # set a default choice
+    choice='n'
+
+    # read & process choice
     read -r choice
     case $choice in
         [Oo]*) return 0 ;;
@@ -284,11 +291,11 @@ resolve_file_conflict() {
         return 1
     fi
 
+    # if adopt is enabled we force adoption
+    [ "$ADOPT" -gt 0 ] && { warn "auto-adopting '""$1""'"; return 2; }
+
     # if force is enabled we can override
-    if [ "$FORCE" -gt 0 ]; then
-        warn "force enabled overriding '""$1""'" 
-        return 0
-    fi
+    [ "$FORCE" -gt 0 ] && { warn "auto-overriding '""$1""'"; return 0; }
 
     # prompt the user for conflict resolution option
     prompt_conflict "$1"
@@ -755,13 +762,16 @@ if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then usage && exit 0; fi
 
 # process command line options
 subcommand=$1; shift
-while getopts "fvVh" opt; do
+while getopts "favVh" opt; do
     case $opt in
         f )
             FORCE=1
         ;;
         v )
             VERBOSE=1
+        ;;
+        a )
+            ADOPT=1
         ;;
         h )
             usage
@@ -792,7 +802,7 @@ case $subcommand in
     * )
         $ENV 'ddm-'"$subcommand" "$@" 2>/dev/null && { exit 0; }
 
-        # env will return err code 127 if it cannot find the program 
+        # env will return err code 127 if it cannot find the program - we test for that and return an error
         [ "$?" -eq 127 ] && { error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."; exit 1; }
     ;;
 esac
