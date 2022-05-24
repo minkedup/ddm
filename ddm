@@ -679,7 +679,7 @@ adopt() {
 # removes boilerplate/indicator folders from them before pretty
 # printing.
 ##
-packtree() {
+tree() {
     populate_caches
 
     # get subdirectories of all non-dotfile folders
@@ -771,7 +771,7 @@ case $subcommand in
         adopt
     ;;
     'tree' )
-        packtree
+        tree
     ;;
     * )
         $ENV 'ddm-'"$subcommand" "$@" 2>/dev/null && { exit 0; }
