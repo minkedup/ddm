@@ -12,7 +12,7 @@ RM="$ENV"' rm'
 FIND="$ENV"' find'
 GREP="$ENV"' grep'
 MKDIR="$ENV"' mkdir -p'
-RMDIR="$ENV"'rmdir -p' 
+RMDIR="$ENV"' rmdir -p' 
 
 VALID_INSTALL_METHODS='symlink copy'
 
@@ -367,23 +367,18 @@ create_dir_if_not_exists() {
 }
 
 ##
-# derives a destination file name from an input source filename.
+# derives a destination filename from an input filename or path.
 #
-# @1      - the filename to transform 
+# @1      - the filename or path containing filename to transform 
 # @return - the transformed filename
 ##
-translate_name() {
-    # only operate on files
-    ! [ -f "$1" ] && { printf '%s' "$1"; return 0; }
-
+trans_name() {
+    # obtain the filename from input
     filename="$(basename "$1")"
-    path="$(dirname "$1")"'/'
 
-    #do not include current directory path
-    [ "$path" = './' ] && path=''
-
+    # replace prefix if it exists and return
     filename='.'"${filename#dot-}"
-    printf '%s' "$path""$filename"
+    printf '%s' "$filename"
 }
 
 #################### FUNCTIONALITY ####################
@@ -482,7 +477,7 @@ install_config() {
         . "$meta_script"
     fi
 
-    # perform sanity checks on install variables
+    ## perform sanity checks on install variables
 
     # check install method
     if ! in_array "$install_method" "$VALID_INSTALL_METHODS"; then
@@ -522,8 +517,8 @@ install_config() {
     esac
 
     for conf in $confs; do
-        conf_fname="$(basename "$conf")"
-        dest_path="$install_dir"'/'"$conf_fname"
+        dest_fname="$(trans_name "$conf")"
+        dest_path="$install_dir"'/'"$dest_fname"
         src_path="$(realpath "$conf")"
 
         # pretty-print current file operation
