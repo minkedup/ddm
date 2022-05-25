@@ -366,6 +366,26 @@ create_dir_if_not_exists() {
     return 0
 }
 
+##
+# derives a destination file name from an input source filename.
+#
+# @1      - the filename to transform 
+# @return - the transformed filename
+##
+translate_name() {
+    # only operate on files
+    ! [ -f "$1" ] && { printf '%s' "$1"; return 0; }
+
+    filename="$(basename "$1")"
+    path="$(dirname "$1")"'/'
+
+    #do not include current directory path
+    [ "$path" = './' ] && path=''
+
+    filename='.'"${filename#dot-}"
+    printf '%s' "$path""$filename"
+}
+
 #################### FUNCTIONALITY ####################
 
 ##
@@ -703,7 +723,7 @@ adopt() {
 # removes boilerplate/indicator folders from them before pretty
 # printing.
 ##
-tree() {
+ptree() {
     populate_caches
 
     # get subdirectories of all non-dotfile folders
@@ -798,7 +818,7 @@ case $subcommand in
         adopt
     ;;
     'tree' )
-        tree
+        ptree
     ;;
     * )
         $ENV 'ddm-'"$subcommand" "$@" 2>/dev/null && { exit 0; }
