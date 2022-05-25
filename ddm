@@ -2,16 +2,17 @@
 
 VERSION='0.6.0'
 
-CP='/usr/bin/env cp -L'
-SH='/usr/bin/env sh'
-LN='/usr/bin/env ln -sf'
-LS='/usr/bin/env ls -C'
-RM='/usr/bin/env rm'
 ENV='/usr/bin/env'
-FIND='/usr/bin/env find'
-GREP='/usr/bin/env grep'
-MKDIR='/usr/bin/env mkdir -p'
-RMDIR='rmdir -p' 
+
+CP="$ENV"' cp -L'
+SH="$ENV"' sh'
+LN="$ENV"' ln -sf'
+LS="$ENV"' ls -C'
+RM="$ENV"' rm'
+FIND="$ENV"' find'
+GREP="$ENV"' grep'
+MKDIR="$ENV"' mkdir -p'
+RMDIR="$ENV"'rmdir -p' 
 
 VALID_INSTALL_METHODS='symlink copy'
 
@@ -482,7 +483,7 @@ install_config() {
     # normally globs don't match dotfiles so we need two passes, once to
     # pick up the dotfiles, another to pick up any other files
     confs="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
-    confs="$confs""$(collect_glob '*' "$confs_location")"
+    confs="$confs""$(collect_glob "$NORMFILES_GLOB" "$confs_location")"
 
     # derive and cache install function
     case "$install_method" in
