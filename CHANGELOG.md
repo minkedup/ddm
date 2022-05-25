@@ -2,6 +2,20 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.7.0 - 2022-05-25
+#### Bug Fixes
+- fixed misspelling of glob variable - (6029941) - Mickey Polito
+#### Features
+- added automatic adoption flag - (139e430) - Mickey Polito
+- added adoption as an option to conflict resolution prompt - (f054d7a) - Mickey Polito
+#### Miscellaneous Chores
+- updated binary version - (2f9471b) - Mickey Polito
+#### Refactoring
+- made use of env var in command definitions - (7b704b1) - Mickey Polito
+- changed name of internal tree function - (455f1f7) - Mickey Polito
+
+- - -
+
 ## 0.6.0 - 2022-05-24
 #### Documentation
 - revised STANDARD documentation for submodules - (3f6fc9a) - Mickey Polito

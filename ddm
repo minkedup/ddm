@@ -1,17 +1,18 @@
 #!/usr/bin/env sh
 
-VERSION='0.6.0'
+VERSION='0.7.0'
 
-CP='/usr/bin/env cp -L'
-SH='/usr/bin/env sh'
-LN='/usr/bin/env ln -sf'
-LS='/usr/bin/env ls -C'
-RM='/usr/bin/env rm'
 ENV='/usr/bin/env'
-FIND='/usr/bin/env find'
-GREP='/usr/bin/env grep'
-MKDIR='/usr/bin/env mkdir -p'
-RMDIR='rmdir -p' 
+
+CP="$ENV"' cp -L'
+SH="$ENV"' sh'
+LN="$ENV"' ln -sf'
+LS="$ENV"' ls -C'
+RM="$ENV"' rm'
+FIND="$ENV"' find'
+GREP="$ENV"' grep'
+MKDIR="$ENV"' mkdir -p'
+RMDIR="$ENV"'rmdir -p' 
 
 VALID_INSTALL_METHODS='symlink copy'
 
@@ -33,6 +34,7 @@ YELLO='\e[33m'
 
 VERBOSE=0
 FORCE=0
+ADOPT=0
 
 ############################## OUTPUT ##############################
 
@@ -56,8 +58,9 @@ COMMANDS:
     tree         List configuration packs in a tree-like way 
 
 OPTIONS:
-    -f    Do not prompt for file conflicts
     -v    Increase verbosity to debug levels
+    -f    Overwrite file conflicts
+    -a    Adopt file conflicts
     -h    Show this help
 EOF
 }
@@ -95,21 +98,29 @@ error() {
 }
 
 ##
-# prompts the user to resolve a file conflict
+# prompts the user to resolve a file conflict by overwriting,
+# adopting, or neither.
 #
-# this function prompts the user to overwrite a given file, allowing
-# the user to respond with Y\N (with Y as a default).
-#
-# @1      - the name of the file to prompt the user to overwrite
-# @return - true for overwrite (yes), false otherwise
+# @1       - path to show to user
+# @return  - 
+#     0 - Overwrite
+#     1 - Leave Alone
+#     2 - Adopt
+#     3 - Unknown
 ##
 prompt_conflict() {
-    warn 'conflict detected at '"$1"' do you want to overwrite (Y/n)? [Y] '
-    choice='y'
+    # give the user a prompt to contextualize their choice
+    warn 'conflict at '"$1"'; do you want to overwrite, adopt, or leave alone?(O/A/n)? [O] '
+
+    # set a default choice
+    choice='n'
+
+    # read & process choice
     read -r choice
     case $choice in
-        [Yy]*) return 0 ;;
+        [Oo]*) return 0 ;;
         [Nn]*) return 1 ;;
+        [Aa]*) return 2 ;;
     esac
 }
 
@@ -267,28 +278,37 @@ log_node() {
 # decision
 #
 # @1      - the destination file to check
-# @return - 0 for a successful resolution, 1 if a conflict could
+# @return - 0 for success, 2 for adoption, 1 to skip (failure) 
 ##
 resolve_file_conflict() {
-    # if the file doesn't exist we don't have a problem
+    # if the node doesn't exist we don't have a problem
     ! [ -e "$1" ] && return 0
+
+    dest_filename="$(basename "$1")"
 
     # if it's in the files we've created we can skip
     if in_array "$1" "$CREATED_FILES_CACHE"; then
-        info "skipping '""$(basename "$1")""'; already installed"
+        info "skipping '$dest_filename'; already installed"
         return 1
     fi
+
+    # if adopt is enabled we force adoption
+    [ "$ADOPT" -gt 0 ] && { warn "auto-adopting '""$1""'"; return 2; }
 
     # if force is enabled we can override
-    if [ "$FORCE" -gt 0 ]; then
-        warn "force enabled overriding '""$1""' with symlink"
-        return 0
-    fi
+    [ "$FORCE" -gt 0 ] && { warn "auto-overriding '""$1""'"; return 0; }
 
-    if ! prompt_conflict "$1"; then
-        info "skipping '""$(basename "$1")""'"
-        return 1
-    fi
+    # prompt the user for conflict resolution option
+    prompt_conflict "$1"
+
+    # propagate results & give user output
+    case $? in
+        0 ) return 0 ;; 
+        1 ) info "skipping '$dest_filename'"; return 1; ;;
+        2 ) info "adopting '$dest_filename'"; return 2; ;;
+    esac
+
+    return 1
 }
 
 ##
@@ -463,7 +483,7 @@ install_config() {
     # normally globs don't match dotfiles so we need two passes, once to
     # pick up the dotfiles, another to pick up any other files
     confs="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
-    confs="$confs""$(collect_glob '*' "$confs_location")"
+    confs="$confs""$(collect_glob "$NORMFILE_GLOB" "$confs_location")"
 
     # derive and cache install function
     case "$install_method" in
@@ -476,7 +496,7 @@ install_config() {
             fname_pretty='copying'
             ;;
         *)
-            error "unreachable; unknown install method '""$install_method""'"
+            error "unknown install method '""$install_method""'"
             return 1
             ;;
     esac
@@ -489,15 +509,19 @@ install_config() {
         # pretty-print current file operation
         info "$fname_pretty"" '""$conf""' to '""$install_dir""'"
 
-        # check whether or not the user wants to overwrite the dest_path
-        if resolve_file_conflict "$dest_path"; then
-            # the user has indicated that they want to override, so delete
-            # the file that currently exists to make room for new file
-            [ -f "$dest_path" ] && { $RM "$dest_path"; }
-        else
-            # if we couldn't resolve the conflict skip the file
-            continue
-        fi
+        # attempt to resolve file conflict if one exists 
+        resolve_file_conflict "$dest_path"
+
+        # continue on resolution error 
+        [ "$?" -eq 1 ] && continue
+
+        # adopt file if the user indicated they would like us to
+        # in conflict resolution - then continue as normal
+        [ "$?" -eq 2 ] && $CP "$dest_path" "$src_path"
+
+        # we get here if $? = 0 meaning the user wants to remove
+        # the file and overwrite if it exists - so we delete it
+        [ -f "$dest_path" ] && { $RM "$dest_path"; }
 
         # install with fully qualified paths
         $install_fn "$src_path" "$dest_path"
@@ -739,13 +763,16 @@ if [ "$1" = '-h' ] || [ "$1" = '--help' ]; then usage && exit 0; fi
 
 # process command line options
 subcommand=$1; shift
-while getopts "fvVh" opt; do
+while getopts "favVh" opt; do
     case $opt in
         f )
             FORCE=1
         ;;
         v )
             VERBOSE=1
+        ;;
+        a )
+            ADOPT=1
         ;;
         h )
             usage
@@ -776,7 +803,7 @@ case $subcommand in
     * )
         $ENV 'ddm-'"$subcommand" "$@" 2>/dev/null && { exit 0; }
 
-        # env will return err code 127 if it cannot find the program 
+        # env will return err code 127 if it cannot find the program - we test for that and return an error
         [ "$?" -eq 127 ] && { error "'""$subcommand""'"" is not a ddm command. See 'ddm -h'."; exit 1; }
     ;;
 esac
