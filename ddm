@@ -483,7 +483,7 @@ install_config() {
     # normally globs don't match dotfiles so we need two passes, once to
     # pick up the dotfiles, another to pick up any other files
     confs="$(collect_glob "$DOTFILES_GLOB" "$confs_location")"
-    confs="$confs""$(collect_glob "$NORMFILES_GLOB" "$confs_location")"
+    confs="$confs""$(collect_glob "$NORMFILE_GLOB" "$confs_location")"
 
     # derive and cache install function
     case "$install_method" in
